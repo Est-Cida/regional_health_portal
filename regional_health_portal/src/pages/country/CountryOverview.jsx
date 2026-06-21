@@ -25,13 +25,52 @@ export default function CountryOverview() {
 
   const [view, setView] = useState('charts')
 
-  const summary     = useMemo(() => selectedIso ? getSurveillanceSummary(selectedIso, selectedYear) : null, [selectedIso, selectedYear])
-  const trend       = useMemo(() => selectedIso ? getSurveillanceTrend(selectedIso)                 : [], [selectedIso])
-  const outbreaks   = useMemo(() => selectedIso ? getOutbreaks(selectedIso, selectedYear)           : [], [selectedIso, selectedYear])
-  const labData     = useMemo(() => selectedIso ? getLabCapacity(selectedIso, selectedYear)         : null, [selectedIso, selectedYear])
+  const yearLabel = selectedYear === 'all' ? 'All Years' : selectedYear
 
-  const prevSummary = useMemo(() => (selectedIso && selectedYear > 2021)
-    ? getSurveillanceSummary(selectedIso, selectedYear - 1) : null, [selectedIso, selectedYear])
+  const summary = useMemo(() => {
+    if (!selectedIso) return null
+    if (selectedYear === 'all') {
+      const rows = state.surveillance.filter(s => s.iso_3_code === selectedIso)
+      if (!rows.length) return null
+      const n = rows.length
+      const byDisease = {}
+      rows.forEach(r => {
+        if (!byDisease[r.disease]) byDisease[r.disease] = { disease: r.disease, cases_reported: 0 }
+        byDisease[r.disease].cases_reported += r.cases_reported || 0
+      })
+      return {
+        totalCases:     rows.reduce((s, r) => s + (r.cases_reported           || 0), 0),
+        totalDeaths:    rows.reduce((s, r) => s + (r.deaths_reported          || 0), 0),
+        avgAttackRate:  rows.reduce((s, r) => s + (r.attack_rate_per_100k     || 0), 0) / n,
+        avgCFR:         rows.reduce((s, r) => s + (r.case_fatality_ratio_pct  || 0), 0) / n,
+        diseaseBreakdown: Object.values(byDisease),
+      }
+    }
+    return getSurveillanceSummary(selectedIso, selectedYear)
+  }, [selectedIso, selectedYear, state.surveillance])
+
+  const trend     = useMemo(() => selectedIso ? getSurveillanceTrend(selectedIso) : [], [selectedIso])
+
+  const outbreaks = useMemo(() => {
+    if (!selectedIso) return []
+    if (selectedYear === 'all') return state.outbreaks.filter(o => o.iso_3_code === selectedIso)
+    return getOutbreaks(selectedIso, selectedYear)
+  }, [selectedIso, selectedYear, state.outbreaks])
+
+  const labData = useMemo(() => {
+    if (!selectedIso) return null
+    if (selectedYear === 'all') {
+      const rows = state.labCapacity.filter(l => l.iso_3_code === selectedIso)
+      if (!rows.length) return null
+      return { iso15189_accreditation_pct: rows.reduce((s, r) => s + (r.iso15189_accreditation_pct || 0), 0) / rows.length }
+    }
+    return getLabCapacity(selectedIso, selectedYear)
+  }, [selectedIso, selectedYear, state.labCapacity])
+
+  const prevSummary = useMemo(() => {
+    if (!selectedIso || selectedYear === 'all' || selectedYear <= 2021) return null
+    return getSurveillanceSummary(selectedIso, selectedYear - 1)
+  }, [selectedIso, selectedYear])
 
   const caseTrend  = summary && prevSummary?.totalCases  > 0
     ? ((summary.totalCases  - prevSummary.totalCases)  / prevSummary.totalCases)  * 100 : undefined
@@ -80,14 +119,14 @@ export default function CountryOverview() {
             <KPICard title="Total Deaths"       value={summary?.totalDeaths?.toLocaleString()}             subtitle="All diseases"               color="red"    icon="deaths" trend={deathTrend} />
             <KPICard title="Avg. Attack Rate"   value={summary?.avgAttackRate?.toFixed(2)}                 subtitle="per 100,000 population"     color="orange" icon="attack" />
             <KPICard title="Avg. Case Fatality" value={summary ? `${summary.avgCFR?.toFixed(2)}%` : null} subtitle="Case fatality ratio"        color="purple" icon="cfr" />
-            <KPICard title="Outbreaks"          value={outbreaks.length}                                   subtitle={`recorded in ${selectedYear}`} color="teal" icon="alert" />
+            <KPICard title="Outbreaks"          value={outbreaks.length}                                   subtitle={`recorded in ${yearLabel}`} color="teal" icon="alert" />
             <KPICard title="Lab Accreditation"  value={labData ? `${labData.iso15189_accreditation_pct?.toFixed(1)}%` : null} subtitle="ISO 15189 certified" color="green" icon="lab" />
           </div>
 
           <div className="charts-grid section">
             <div className="card">
               <div className="card-header">
-                <h2 className="card-title">Disease Burden — {selectedYear}</h2>
+                <h2 className="card-title">Disease Burden — {yearLabel}</h2>
                 <button className="btn-link" onClick={() => navigate('/country/diseases')}>View detail →</button>
               </div>
               <DiseaseBarChart data={summary?.diseaseBreakdown || []} />

@@ -60,15 +60,28 @@ export default function FundingDashboard() {
   const [editRecord,   setEditRecord]   = useState(null)
   const [deleteRecord, setDeleteRecord] = useState(null)
 
+  const yearLabel = selectedYear === 'all' ? 'All Years' : selectedYear
+
   const allYears = useMemo(
     () => state.funding.filter(f => f.iso_3_code === selectedIso).sort((a, b) => a.year - b.year),
     [state.funding, selectedIso],
   )
 
-  const current = useMemo(
-    () => allYears.find(f => f.year === Number(selectedYear)) || null,
-    [allYears, selectedYear],
-  )
+  const current = useMemo(() => {
+    if (selectedYear === 'all') {
+      if (!allYears.length) return null
+      const n = allYears.length
+      return {
+        year: 'all',
+        total_funding_usd:           allYears.reduce((s, r) => s + (r.total_funding_usd           || 0), 0),
+        domestic_funding_usd:        allYears.reduce((s, r) => s + (r.domestic_funding_usd        || 0), 0),
+        external_funding_usd:        allYears.reduce((s, r) => s + (r.external_funding_usd        || 0), 0),
+        funding_per_capita_usd:      allYears.reduce((s, r) => s + (r.funding_per_capita_usd      || 0), 0) / n,
+        domestic_funding_share_pct:  allYears.reduce((s, r) => s + (r.domestic_funding_share_pct  || 0), 0) / n,
+      }
+    }
+    return allYears.find(f => f.year === Number(selectedYear)) || null
+  }, [allYears, selectedYear])
 
   if (!selectedIso) return <div className="page-empty">Select a country above.</div>
 
@@ -79,7 +92,7 @@ export default function FundingDashboard() {
     <>
       <div className="page-header-slim">
         <h1 className="page-title">Health Financing</h1>
-        <p className="page-desc">Domestic &amp; external health funding · {selectedYear}</p>
+        <p className="page-desc">Domestic &amp; external health funding · {yearLabel}</p>
       </div>
 
       <PageTabs view={view} onChange={setView} />
@@ -115,7 +128,7 @@ export default function FundingDashboard() {
       {current && (
         <section className="section">
           <div className="capacity-card">
-            <h3 className="capacity-title">Domestic vs External Split — {selectedYear}</h3>
+            <h3 className="capacity-title">Domestic vs External Split — {yearLabel}</h3>
             <div className="funding-stacked-labels">
               <span>Domestic ({domShare.toFixed(1)}%)</span>
               <span>External ({extShare.toFixed(1)}%)</span>

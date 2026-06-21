@@ -299,7 +299,7 @@ export default function OutbreaksDashboard() {
       {showAdd && (
         <AddOutbreakModal
           iso3={selectedIso}
-          year={selectedYear}
+          year={selectedYear === 'all' ? 2025 : selectedYear}
           existingOutbreaks={state.outbreaks}
           onSave={handleAddOutbreak}
           onClose={() => setShowAdd(false)}

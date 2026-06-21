@@ -53,17 +53,17 @@ function CountrySubHeader() {
             ))}
           </select>
         )}
-        <div className="year-tabs">
-          {YEARS.map(y => (
-            <button
-              key={y}
-              className={`year-tab${selectedYear === y ? ' active' : ''}`}
-              onClick={() => setSelectedYear(y)}
-            >
-              {y}
-            </button>
-          ))}
-        </div>
+        <select
+          className="select-control"
+          value={selectedYear}
+          onChange={e => {
+            const v = e.target.value
+            setSelectedYear(v === 'all' ? 'all' : Number(v))
+          }}
+        >
+          <option value="all">All Years</option>
+          {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
       </div>
     </div>
   )

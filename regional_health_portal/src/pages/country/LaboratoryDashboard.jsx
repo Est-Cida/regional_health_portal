@@ -86,6 +86,8 @@ export default function LaboratoryDashboard() {
   const [editRecord,   setEditRecord]   = useState(null)
   const [deleteRecord, setDeleteRecord] = useState(null)
 
+  const yearLabel = selectedYear === 'all' ? 'All Years' : selectedYear
+
   const allYears = useMemo(
     () => state.labCapacity
       .filter(l => l.iso_3_code === selectedIso)
@@ -93,10 +95,22 @@ export default function LaboratoryDashboard() {
     [state.labCapacity, selectedIso],
   )
 
-  const current = useMemo(
-    () => allYears.find(l => l.year === Number(selectedYear)) || null,
-    [allYears, selectedYear],
-  )
+  const current = useMemo(() => {
+    if (selectedYear === 'all') {
+      if (!allYears.length) return null
+      const n = allYears.length
+      return {
+        iso_3_code: selectedIso,
+        year: 'all',
+        total_public_labs:           Math.round(allYears.reduce((s, r) => s + (r.total_public_labs           || 0), 0) / n),
+        labs_iso15189_accredited:    Math.round(allYears.reduce((s, r) => s + (r.labs_iso15189_accredited    || 0), 0) / n),
+        iso15189_accreditation_pct:  allYears.reduce((s, r) => s + (r.iso15189_accreditation_pct  || 0), 0) / n,
+        avg_turnaround_time_days:    allYears.reduce((s, r) => s + (r.avg_turnaround_time_days    || 0), 0) / n,
+        diagnostic_tests_per_100k:   Math.round(allYears.reduce((s, r) => s + (r.diagnostic_tests_per_100k  || 0), 0) / n),
+      }
+    }
+    return allYears.find(l => l.year === Number(selectedYear)) || null
+  }, [allYears, selectedYear, selectedIso])
 
   function handleSaveEdit(changes) {
     update('labCapacity', rowId('labCapacity', editRecord), changes)
@@ -114,7 +128,7 @@ export default function LaboratoryDashboard() {
     <>
       <div className="page-header-slim">
         <h1 className="page-title">Laboratory Capacity</h1>
-        <p className="page-desc">Lab infrastructure, accreditation &amp; diagnostic output · {selectedYear}</p>
+        <p className="page-desc">Lab infrastructure, accreditation &amp; diagnostic output · {yearLabel}</p>
       </div>
 
       <PageTabs view={view} onChange={setView} />

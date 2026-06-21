@@ -76,6 +76,8 @@ export default function CapacityDashboard() {
   const [editRep,    setEditRep]    = useState(null)
   const [deleteRep,  setDeleteRep]  = useState(null)
 
+  const yearLabel = selectedYear === 'all' ? 'All Years' : selectedYear
+
   const workforceAll = useMemo(
     () => state.workforce.filter(w => w.iso_3_code === selectedIso).sort((a, b) => a.year - b.year),
     [state.workforce, selectedIso],
@@ -85,14 +87,34 @@ export default function CapacityDashboard() {
     [state.reporting, selectedIso],
   )
 
-  const workforce = useMemo(
-    () => workforceAll.find(w => w.year === Number(selectedYear)) || null,
-    [workforceAll, selectedYear],
-  )
-  const reporting = useMemo(
-    () => reportingAll.find(r => r.year === Number(selectedYear)) || null,
-    [reportingAll, selectedYear],
-  )
+  const workforce = useMemo(() => {
+    if (selectedYear === 'all') {
+      if (!workforceAll.length) return null
+      const n = workforceAll.length
+      return {
+        epidemiologists_total:      Math.round(workforceAll.reduce((s, r) => s + (r.epidemiologists_total      || 0), 0) / n),
+        epidemiologists_per_100k:   workforceAll.reduce((s, r) => s + (r.epidemiologists_per_100k   || 0), 0) / n,
+        feltp_trained_total:        Math.round(workforceAll.reduce((s, r) => s + (r.feltp_trained_total        || 0), 0) / n),
+        feltp_trained_pct:          workforceAll.reduce((s, r) => s + (r.feltp_trained_pct          || 0), 0) / n,
+        lab_technicians_total:      Math.round(workforceAll.reduce((s, r) => s + (r.lab_technicians_total      || 0), 0) / n),
+        lab_technicians_per_100k:   workforceAll.reduce((s, r) => s + (r.lab_technicians_per_100k   || 0), 0) / n,
+      }
+    }
+    return workforceAll.find(w => w.year === Number(selectedYear)) || null
+  }, [workforceAll, selectedYear])
+
+  const reporting = useMemo(() => {
+    if (selectedYear === 'all') {
+      if (!reportingAll.length) return null
+      const n = reportingAll.length
+      return {
+        timeliness_pct:              reportingAll.reduce((s, r) => s + (r.timeliness_pct              || 0), 0) / n,
+        completeness_pct:            reportingAll.reduce((s, r) => s + (r.completeness_pct            || 0), 0) / n,
+        idsr_weekly_compliance_pct:  reportingAll.reduce((s, r) => s + (r.idsr_weekly_compliance_pct  || 0), 0) / n,
+      }
+    }
+    return reportingAll.find(r => r.year === Number(selectedYear)) || null
+  }, [reportingAll, selectedYear])
 
   if (!selectedIso) return <div className="page-empty">Select a country above.</div>
 
@@ -100,7 +122,7 @@ export default function CapacityDashboard() {
     <>
       <div className="page-header-slim">
         <h1 className="page-title">Health Capacity</h1>
-        <p className="page-desc">Workforce &amp; surveillance reporting · {selectedYear}</p>
+        <p className="page-desc">Workforce &amp; surveillance reporting · {yearLabel}</p>
       </div>
 
       <PageTabs view={view} onChange={setView} />
@@ -167,7 +189,7 @@ export default function CapacityDashboard() {
 
       {/* Reporting Metrics */}
       <section className="section">
-        <h2 className="section-heading">Surveillance Reporting — {selectedYear}</h2>
+        <h2 className="section-heading">Surveillance Reporting — {yearLabel}</h2>
 
         {reporting ? (
           <div className="capacity-card" style={{ marginBottom: 16 }}>

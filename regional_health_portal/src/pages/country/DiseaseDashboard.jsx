@@ -73,6 +73,8 @@ export default function DiseaseDashboard() {
   const [editRecord,   setEditRecord]   = useState(null)
   const [deleteRecord, setDeleteRecord] = useState(null)
 
+  const yearLabel = selectedYear === 'all' ? 'All Years' : selectedYear
+
   // All surveillance rows for this country — used by table tab
   const allSurvRows = useMemo(() => {
     if (!selectedIso) return []
@@ -86,6 +88,24 @@ export default function DiseaseDashboard() {
   // Disease rows for selected country + year (from DataStore)
   const diseases = useMemo(() => {
     if (!selectedIso) return []
+    if (selectedYear === 'all') {
+      const byDisease = {}
+      state.surveillance.filter(s => s.iso_3_code === selectedIso).forEach(s => {
+        if (!byDisease[s.disease]) {
+          byDisease[s.disease] = { ...s, cases_reported: 0, deaths_reported: 0, _arSum: 0, _cfrSum: 0, _n: 0 }
+        }
+        byDisease[s.disease].cases_reported  += s.cases_reported           || 0
+        byDisease[s.disease].deaths_reported += s.deaths_reported          || 0
+        byDisease[s.disease]._arSum          += s.attack_rate_per_100k     || 0
+        byDisease[s.disease]._cfrSum         += s.case_fatality_ratio_pct  || 0
+        byDisease[s.disease]._n              += 1
+      })
+      return Object.values(byDisease).map(({ _arSum, _cfrSum, _n, ...d }) => ({
+        ...d,
+        attack_rate_per_100k:    _n > 0 ? _arSum  / _n : 0,
+        case_fatality_ratio_pct: _n > 0 ? _cfrSum / _n : 0,
+      }))
+    }
     return state.surveillance
       .filter(s => s.iso_3_code === selectedIso && s.year === Number(selectedYear))
   }, [state.surveillance, selectedIso, selectedYear])
@@ -138,7 +158,7 @@ export default function DiseaseDashboard() {
     <>
       <div className="page-header-slim">
         <h1 className="page-title">Disease Surveillance</h1>
-        <p className="page-desc">Notifiable disease data · {selectedYear}</p>
+        <p className="page-desc">Notifiable disease data · {yearLabel}</p>
       </div>
 
       <PageTabs view={view} onChange={setView} />
@@ -150,7 +170,7 @@ export default function DiseaseDashboard() {
       <section className="section">
         <div className="card">
           <div className="card-header">
-            <h2 className="card-title">Disease Summary — {selectedYear}</h2>
+            <h2 className="card-title">Disease Summary — {yearLabel}</h2>
           </div>
           <div className="table-wrapper">
             <table className="data-table">

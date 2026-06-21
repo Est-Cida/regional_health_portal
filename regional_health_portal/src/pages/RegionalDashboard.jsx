@@ -43,10 +43,29 @@ export default function RegionalDashboard() {
   const [selectedYear,      setSelectedYear]       = useState(2024)
   const [mapMetric,         setMapMetric]          = useState('totalCases')
 
-  const overview = useMemo(
-    () => getRegionalOverview(selectedSubregion, selectedYear),
-    [selectedSubregion, selectedYear],
-  )
+  const yearLabel = selectedYear === 'all' ? 'All Years' : selectedYear
+
+  const overview = useMemo(() => {
+    if (selectedYear !== 'all') return getRegionalOverview(selectedSubregion, selectedYear)
+    // Aggregate across all years per country
+    const byIso = {}
+    YEARS.forEach(y => {
+      getRegionalOverview(selectedSubregion, y).forEach(c => {
+        if (!byIso[c.iso3]) {
+          byIso[c.iso3] = { ...c, totalCases: 0, totalDeaths: 0, outbreakCount: 0, _cfrSum: 0, _n: 0 }
+        }
+        byIso[c.iso3].totalCases    += c.totalCases
+        byIso[c.iso3].totalDeaths   += c.totalDeaths
+        byIso[c.iso3].outbreakCount += c.outbreakCount
+        byIso[c.iso3]._cfrSum       += c.avgCFR
+        byIso[c.iso3]._n            += 1
+      })
+    })
+    return Object.values(byIso).map(({ _cfrSum, _n, ...c }) => ({
+      ...c,
+      avgCFR: _n > 0 ? _cfrSum / _n : 0,
+    }))
+  }, [selectedSubregion, selectedYear])
 
   const totalCases  = overview.reduce((s, c) => s + c.totalCases,    0)
   const totalDeaths = overview.reduce((s, c) => s + c.totalDeaths,   0)
@@ -65,7 +84,7 @@ export default function RegionalDashboard() {
               <div className="page-breadcrumb">Regional Overview</div>
               <h1 className="page-title">{selectedSubregion} Africa Regional Dashboard</h1>
               <p className="page-desc">
-                {overview.length} countries · {selectedYear} surveillance data
+                {overview.length} countries · {yearLabel} surveillance data
               </p>
             </div>
             <div className="page-header-controls">
@@ -88,8 +107,12 @@ export default function RegionalDashboard() {
                 <select
                   className="select-control"
                   value={selectedYear}
-                  onChange={e => setSelectedYear(Number(e.target.value))}
+                  onChange={e => {
+                    const v = e.target.value
+                    setSelectedYear(v === 'all' ? 'all' : Number(v))
+                  }}
                 >
+                  <option value="all">All Years</option>
                   {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
               </div>
@@ -112,7 +135,7 @@ export default function RegionalDashboard() {
               <div className="kpi-card" style={{ borderTop: '4px solid #D97706', background: '#FFF8ED' }}>
                 <div className="kpi-card-header"><span className="kpi-title">Total Outbreaks</span></div>
                 <div className="kpi-value" style={{ color: '#D97706' }}>{totalObs}</div>
-                <div className="kpi-subtitle">Recorded in {selectedYear}</div>
+                <div className="kpi-subtitle">Recorded in {yearLabel}</div>
               </div>
             </div>
           </section>
@@ -124,7 +147,7 @@ export default function RegionalDashboard() {
                 <div>
                   <h2 className="card-title">Geographic Distribution</h2>
                   <span className="card-subtitle">
-                    {selectedSubregion} Africa · {selectedYear} · click a country for details
+                    {selectedSubregion} Africa · {yearLabel} · click a country for details
                   </span>
                 </div>
                 <div className="map-metric-toggle">
@@ -153,7 +176,7 @@ export default function RegionalDashboard() {
           <section className="section">
             <div className="card">
               <div className="card-header">
-                <h2 className="card-title">Cases by Country — {selectedYear}</h2>
+                <h2 className="card-title">Cases by Country — {yearLabel}</h2>
                 <span className="card-subtitle">{selectedSubregion} Africa sub-region</span>
               </div>
               <ResponsiveContainer width="100%" height={260}>
@@ -186,7 +209,7 @@ export default function RegionalDashboard() {
           <section className="section">
             <div className="card">
               <div className="card-header">
-                <h2 className="card-title">Country Comparison — {selectedYear}</h2>
+                <h2 className="card-title">Country Comparison — {yearLabel}</h2>
               </div>
               <div className="table-wrapper">
                 <table className="data-table">
