@@ -6,11 +6,11 @@ from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-DB_USER = os.getenv("DB_USER", "postgres").strip('"')
-DB_PASSWORD = os.getenv("DB_PASSWORD", "root").strip('"')
-DB_HOST = os.getenv("DB_HOST", "localhost").strip('"')
-DB_PORT = os.getenv("DB_PORT", "5433").strip('"')
-DB_NAME = os.getenv("DB_NAME", "regional_surveillance").strip('"')
+DB_USER = os.getenv("DB_USER").strip('"')
+DB_PASSWORD = os.getenv("DB_PASSWORD").strip('"')
+DB_HOST = os.getenv("DB_HOST").strip('"')
+DB_PORT = os.getenv("DB_PORT").strip('"')
+DB_NAME = os.getenv("DB_NAME").strip('"')
 
 DATABASE_URL = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
