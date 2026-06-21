@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import { CountryProvider, useCountry } from '../../context/CountryContext'
+import { DataStoreProvider } from '../../context/DataStore'
 import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/Layout/Sidebar'
 import Navbar from '../../components/Layout/Navbar'
@@ -70,6 +71,7 @@ function CountrySubHeader() {
 
 export default function CountryLayout() {
   return (
+    <DataStoreProvider>
     <CountryProvider>
       <div className="app-layout">
         <Sidebar />
@@ -82,5 +84,6 @@ export default function CountryLayout() {
         </div>
       </div>
     </CountryProvider>
+    </DataStoreProvider>
   )
 }

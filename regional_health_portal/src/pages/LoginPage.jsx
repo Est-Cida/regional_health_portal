@@ -25,19 +25,17 @@ export default function LoginPage() {
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-    setTimeout(() => {
-      const result = login(username.trim(), password)
-      setLoading(false)
-      if (result.success) {
-        navigate(REDIRECT[result.user.role] || '/country')
-      } else {
-        setError(result.error)
-      }
-    }, 300)
+    const result = await login(username.trim(), password)
+    setLoading(false)
+    if (result.success) {
+      navigate(REDIRECT[result.user.role] || '/country')
+    } else {
+      setError(result.error)
+    }
   }
 
   const fillHint = (hint) => {

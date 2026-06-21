@@ -1,10 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useCountry } from '../../context/CountryContext'
-import { getOutbreaksAllYears, getDiseaseList, YEARS } from '../../data/dataService'
+import { useDataStore, rowId } from '../../context/DataStore'
+import { useAuth } from '../../context/AuthContext'
+import { getDiseaseList, YEARS } from '../../data/dataService'
 import OutbreakTable from '../../components/OutbreakTable'
+import EditRecordModal from '../../components/EditRecordModal'
+import AddOutbreakModal from '../../components/AddOutbreakModal'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell, Legend,
+  ResponsiveContainer, Cell,
 } from 'recharts'
 
 const DISEASE_COLORS = {
@@ -15,12 +20,24 @@ const DISEASE_COLORS = {
 
 export default function OutbreaksDashboard() {
   const { selectedIso, selectedYear } = useCountry()
+  const { state, update, remove, add } = useDataStore()
+  const { user } = useAuth()
+  const canEdit = user.role === 'country_admin'
 
   const [filterYear,    setFilterYear]    = useState('all')
   const [filterDisease, setFilterDisease] = useState('all')
+  const [editRecord,    setEditRecord]    = useState(null)
+  const [deleteRecord,  setDeleteRecord]  = useState(null)
+  const [showAdd,       setShowAdd]       = useState(false)
 
-  const allOutbreaks = useMemo(() => selectedIso ? getOutbreaksAllYears(selectedIso) : [], [selectedIso])
-  const diseases     = useMemo(() => getDiseaseList(), [])
+  const diseases = useMemo(() => getDiseaseList(), [])
+
+  const allOutbreaks = useMemo(
+    () => state.outbreaks
+      .filter(o => o.iso_3_code === selectedIso)
+      .sort((a, b) => new Date(b.start_date) - new Date(a.start_date)),
+    [state.outbreaks, selectedIso],
+  )
 
   const filtered = useMemo(() => {
     let rows = allOutbreaks
@@ -29,23 +46,34 @@ export default function OutbreaksDashboard() {
     return rows
   }, [allOutbreaks, filterYear, filterDisease])
 
-  // Stats
-  const avgDuration  = filtered.length ? (filtered.reduce((s, o) => s + (o.duration_days   || 0), 0) / filtered.length).toFixed(1) : '—'
+  const avgDuration  = filtered.length ? (filtered.reduce((s, o) => s + (o.duration_days          || 0), 0) / filtered.length).toFixed(1) : '—'
   const avgDetection = filtered.length ? (filtered.reduce((s, o) => s + (o.time_to_detection_days || 0), 0) / filtered.length).toFixed(1) : '—'
   const totalCases   = filtered.reduce((s, o) => s + (o.cases  || 0), 0)
-  const totalDeaths  = filtered.reduce((s, o) => s + (o.deaths || 0), 0)
 
-  // Outbreak count by disease (for bar chart, all years)
-  const byDisease = diseases.map(d => ({
-    disease: d,
-    count: allOutbreaks.filter(o => o.disease === d).length,
-  })).filter(d => d.count > 0).sort((a, b) => b.count - a.count)
+  const byDisease = diseases
+    .map(d => ({ disease: d, count: allOutbreaks.filter(o => o.disease === d).length }))
+    .filter(d => d.count > 0)
+    .sort((a, b) => b.count - a.count)
 
-  // Year trend
   const byYear = YEARS.map(y => ({
     year: y,
     count: allOutbreaks.filter(o => o.year === y).length,
   }))
+
+  function handleSaveEdit(changes) {
+    update('outbreaks', rowId('outbreaks', editRecord), changes)
+    setEditRecord(null)
+  }
+
+  function handleConfirmDelete() {
+    remove('outbreaks', rowId('outbreaks', deleteRecord))
+    setDeleteRecord(null)
+  }
+
+  function handleAddOutbreak(record) {
+    add('outbreaks', record)
+    setShowAdd(false)
+  }
 
   if (!selectedIso) return <div className="page-empty">Select a country above.</div>
 
@@ -56,7 +84,6 @@ export default function OutbreaksDashboard() {
         <p className="page-desc">Outbreak events across all years</p>
       </div>
 
-      {/* Summary KPI row */}
       <section className="section">
         <div className="kpi-grid kpi-grid-4">
           <div className="kpi-card" style={{ borderTop: '4px solid #D97706', background: '#FFF8ED' }}>
@@ -82,7 +109,6 @@ export default function OutbreaksDashboard() {
         </div>
       </section>
 
-      {/* Charts */}
       <section className="section">
         <div className="charts-grid">
           <div className="card">
@@ -122,7 +148,6 @@ export default function OutbreaksDashboard() {
         </div>
       </section>
 
-      {/* Filterable table */}
       <section className="section">
         <div className="card">
           <div className="card-header">
@@ -136,11 +161,49 @@ export default function OutbreaksDashboard() {
                 <option value="all">All diseases</option>
                 {diseases.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
+              {canEdit && (
+                <button className="btn-add-record" onClick={() => setShowAdd(true)}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Add Outbreak
+                </button>
+              )}
             </div>
           </div>
-          <OutbreakTable data={filtered} />
+          <OutbreakTable
+            data={filtered}
+            onEdit={canEdit ? setEditRecord : undefined}
+            onDelete={canEdit ? setDeleteRecord : undefined}
+          />
         </div>
       </section>
+
+      {editRecord && (
+        <EditRecordModal
+          record={editRecord}
+          tableType="outbreaks"
+          onSave={handleSaveEdit}
+          onClose={() => setEditRecord(null)}
+        />
+      )}
+
+      {deleteRecord && (
+        <ConfirmDialog
+          title="Delete Outbreak"
+          message={`Delete outbreak ${deleteRecord.outbreak_id} (${deleteRecord.disease})? This cannot be undone.`}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteRecord(null)}
+        />
+      )}
+
+      {showAdd && (
+        <AddOutbreakModal
+          iso3={selectedIso}
+          year={selectedYear}
+          existingOutbreaks={state.outbreaks}
+          onSave={handleAddOutbreak}
+          onClose={() => setShowAdd(false)}
+        />
+      )}
     </>
   )
 }

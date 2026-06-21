@@ -1,6 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useCountry } from '../../context/CountryContext'
-import { getFunding, getFundingAllYears } from '../../data/dataService'
+import { useDataStore, rowId } from '../../context/DataStore'
+import { useAuth } from '../../context/AuthContext'
+import EditRecordModal from '../../components/EditRecordModal'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, Cell,
@@ -22,11 +25,48 @@ const ChartTooltip = ({ active, payload, label }) => {
   )
 }
 
+function EditBtn({ onClick }) {
+  return (
+    <button className="btn-action btn-action-edit" onClick={onClick} title="Edit record">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+    </button>
+  )
+}
+
+function DeleteBtn({ onClick }) {
+  return (
+    <button className="btn-action btn-action-delete" onClick={onClick} title="Delete record">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+      </svg>
+    </button>
+  )
+}
+
 export default function FundingDashboard() {
   const { selectedIso, selectedYear } = useCountry()
+  const { state, update, remove } = useDataStore()
+  const { user } = useAuth()
+  const canEdit = user.role === 'country_admin'
 
-  const current  = useMemo(() => selectedIso ? getFunding(selectedIso, selectedYear)  : null, [selectedIso, selectedYear])
-  const allYears = useMemo(() => selectedIso ? getFundingAllYears(selectedIso)         : [], [selectedIso])
+  const [editRecord,   setEditRecord]   = useState(null)
+  const [deleteRecord, setDeleteRecord] = useState(null)
+
+  const allYears = useMemo(
+    () => state.funding.filter(f => f.iso_3_code === selectedIso).sort((a, b) => a.year - b.year),
+    [state.funding, selectedIso],
+  )
+
+  const current = useMemo(
+    () => allYears.find(f => f.year === Number(selectedYear)) || null,
+    [allYears, selectedYear],
+  )
 
   if (!selectedIso) return <div className="page-empty">Select a country above.</div>
 
@@ -66,7 +106,6 @@ export default function FundingDashboard() {
         </div>
       </section>
 
-      {/* Domestic vs External stacked bar */}
       {current && (
         <section className="section">
           <div className="capacity-card">
@@ -143,7 +182,6 @@ export default function FundingDashboard() {
         </div>
       </section>
 
-      {/* Per capita trend */}
       <section className="section">
         <div className="card">
           <div className="card-header">
@@ -175,6 +213,7 @@ export default function FundingDashboard() {
                   <th>External</th>
                   <th>Per Capita (USD)</th>
                   <th>Domestic Share %</th>
+                  {canEdit && <th className="actions-col">Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -188,6 +227,12 @@ export default function FundingDashboard() {
                     <td className={`num ${r.domestic_funding_share_pct >= 50 ? 'text-success' : r.domestic_funding_share_pct < 30 ? 'text-danger' : 'text-warn'}`}>
                       {r.domestic_funding_share_pct?.toFixed(1)}%
                     </td>
+                    {canEdit && (
+                      <td className="actions-col">
+                        <EditBtn   onClick={() => setEditRecord(r)}   />
+                        <DeleteBtn onClick={() => setDeleteRecord(r)} />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -195,6 +240,24 @@ export default function FundingDashboard() {
           </div>
         </div>
       </section>
+
+      {editRecord && (
+        <EditRecordModal
+          record={editRecord}
+          tableType="funding"
+          onSave={changes => { update('funding', rowId('funding', editRecord), changes); setEditRecord(null) }}
+          onClose={() => setEditRecord(null)}
+        />
+      )}
+
+      {deleteRecord && (
+        <ConfirmDialog
+          title="Delete Funding Record"
+          message={`Delete funding data for ${deleteRecord.year}? This cannot be undone.`}
+          onConfirm={() => { remove('funding', rowId('funding', deleteRecord)); setDeleteRecord(null) }}
+          onCancel={() => setDeleteRecord(null)}
+        />
+      )}
     </>
   )
 }

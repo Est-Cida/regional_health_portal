@@ -1,6 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useCountry } from '../../context/CountryContext'
-import { getLabCapacity, getLabCapacityAllYears } from '../../data/dataService'
+import { useDataStore, rowId } from '../../context/DataStore'
+import { useAuth } from '../../context/AuthContext'
+import EditRecordModal from '../../components/EditRecordModal'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, BarChart, Bar,
@@ -48,11 +51,60 @@ function AccreditationGauge({ value }) {
   )
 }
 
+function EditBtn({ onClick }) {
+  return (
+    <button className="btn-action btn-action-edit" onClick={onClick} title="Edit record">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+    </button>
+  )
+}
+
+function DeleteBtn({ onClick }) {
+  return (
+    <button className="btn-action btn-action-delete" onClick={onClick} title="Delete record">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+      </svg>
+    </button>
+  )
+}
+
 export default function LaboratoryDashboard() {
   const { selectedIso, selectedYear } = useCountry()
+  const { state, update, remove } = useDataStore()
+  const { user } = useAuth()
+  const canEdit = user.role === 'country_admin'
 
-  const current = useMemo(() => selectedIso ? getLabCapacity(selectedIso, selectedYear)     : null, [selectedIso, selectedYear])
-  const allYears = useMemo(() => selectedIso ? getLabCapacityAllYears(selectedIso)           : [], [selectedIso])
+  const [editRecord,   setEditRecord]   = useState(null)
+  const [deleteRecord, setDeleteRecord] = useState(null)
+
+  const allYears = useMemo(
+    () => state.labCapacity
+      .filter(l => l.iso_3_code === selectedIso)
+      .sort((a, b) => a.year - b.year),
+    [state.labCapacity, selectedIso],
+  )
+
+  const current = useMemo(
+    () => allYears.find(l => l.year === Number(selectedYear)) || null,
+    [allYears, selectedYear],
+  )
+
+  function handleSaveEdit(changes) {
+    update('labCapacity', rowId('labCapacity', editRecord), changes)
+    setEditRecord(null)
+  }
+
+  function handleConfirmDelete() {
+    remove('labCapacity', rowId('labCapacity', deleteRecord))
+    setDeleteRecord(null)
+  }
 
   if (!selectedIso) return <div className="page-empty">Select a country above.</div>
 
@@ -131,7 +183,6 @@ export default function LaboratoryDashboard() {
         </div>
       </section>
 
-      {/* Diagnostic tests trend */}
       <section className="section">
         <div className="card">
           <div className="card-header">
@@ -152,9 +203,7 @@ export default function LaboratoryDashboard() {
       {/* Year-by-year data table */}
       <section className="section">
         <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Laboratory Data by Year</h2>
-          </div>
+          <div className="card-header"><h2 className="card-title">Laboratory Data by Year</h2></div>
           <div className="table-wrapper">
             <table className="data-table">
               <thead>
@@ -165,6 +214,7 @@ export default function LaboratoryDashboard() {
                   <th>Accreditation %</th>
                   <th>Avg. Turnaround (days)</th>
                   <th>Tests / 100k</th>
+                  {canEdit && <th className="actions-col">Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -180,6 +230,12 @@ export default function LaboratoryDashboard() {
                       {r.avg_turnaround_time_days?.toFixed(1)}
                     </td>
                     <td className="num">{r.diagnostic_tests_per_100k}</td>
+                    {canEdit && (
+                      <td className="actions-col">
+                        <EditBtn   onClick={() => setEditRecord(r)}   />
+                        <DeleteBtn onClick={() => setDeleteRecord(r)} />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -187,6 +243,24 @@ export default function LaboratoryDashboard() {
           </div>
         </div>
       </section>
+
+      {editRecord && (
+        <EditRecordModal
+          record={editRecord}
+          tableType="labCapacity"
+          onSave={handleSaveEdit}
+          onClose={() => setEditRecord(null)}
+        />
+      )}
+
+      {deleteRecord && (
+        <ConfirmDialog
+          title="Delete Laboratory Record"
+          message={`Delete laboratory data for ${deleteRecord.year}? This cannot be undone.`}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteRecord(null)}
+        />
+      )}
     </>
   )
 }
