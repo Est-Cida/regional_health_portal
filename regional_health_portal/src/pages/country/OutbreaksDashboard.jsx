@@ -7,6 +7,7 @@ import OutbreakTable from '../../components/OutbreakTable'
 import EditRecordModal from '../../components/EditRecordModal'
 import AddOutbreakModal from '../../components/AddOutbreakModal'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import PageTabs from '../../components/PageTabs'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
@@ -18,12 +19,37 @@ const DISEASE_COLORS = {
   'Viral haemorrhagic fever': '#8B0000', 'Polio (cVDPV)': '#059669',
 }
 
+function EditBtn({ onClick }) {
+  return (
+    <button className="btn-action btn-action-edit" onClick={onClick} title="Edit record">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+    </button>
+  )
+}
+
+function DeleteBtn({ onClick }) {
+  return (
+    <button className="btn-action btn-action-delete" onClick={onClick} title="Delete record">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+      </svg>
+    </button>
+  )
+}
+
 export default function OutbreaksDashboard() {
   const { selectedIso, selectedYear } = useCountry()
   const { state, update, remove, add } = useDataStore()
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
 
+  const [view,          setView]          = useState('charts')
   const [filterYear,    setFilterYear]    = useState('all')
   const [filterDisease, setFilterDisease] = useState('all')
   const [editRecord,    setEditRecord]    = useState(null)
@@ -83,6 +109,11 @@ export default function OutbreaksDashboard() {
         <h1 className="page-title">Outbreaks</h1>
         <p className="page-desc">Outbreak events across all years</p>
       </div>
+
+      <PageTabs view={view} onChange={setView} />
+
+      {/* ── Charts tab ──────────────────────────────────────────────── */}
+      {view === 'charts' && <>
 
       <section className="section">
         <div className="kpi-grid kpi-grid-4">
@@ -176,6 +207,76 @@ export default function OutbreaksDashboard() {
           />
         </div>
       </section>
+
+      </>}
+
+      {/* ── Data Table tab ─────────────────────────────────────────── */}
+      {view === 'table' && (
+        <section className="section">
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Outbreak Records — All Years</h2>
+              <div className="card-filters">
+                <span className="card-subtitle">{allOutbreaks.length} outbreaks for {selectedIso}</span>
+                {canEdit && (
+                  <button className="btn-add-record" onClick={() => setShowAdd(true)}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add Outbreak
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th>Disease</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Cases</th>
+                    <th>Deaths</th>
+                    <th>Duration (days)</th>
+                    <th>Detection (days)</th>
+                    {canEdit && <th className="actions-col">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {allOutbreaks.length === 0 && (
+                    <tr><td colSpan={canEdit ? 9 : 8} className="table-empty">No outbreak records found</td></tr>
+                  )}
+                  {allOutbreaks.map(o => (
+                    <tr key={o.outbreak_id} className={o.year === selectedYear ? 'row-highlighted' : ''}>
+                      <td>
+                        <strong>{o.year}</strong>
+                        {o.year === selectedYear && <span className="year-badge">selected</span>}
+                      </td>
+                      <td>
+                        <span className="disease-dot" style={{ background: DISEASE_COLORS[o.disease] || '#6B7C93' }} />
+                        {o.disease}
+                      </td>
+                      <td>{o.start_date}</td>
+                      <td>{o.end_date || '—'}</td>
+                      <td className="num">{o.cases?.toLocaleString() ?? '—'}</td>
+                      <td className="num">{o.deaths?.toLocaleString() ?? '—'}</td>
+                      <td className="num">{o.duration_days ?? '—'}</td>
+                      <td className={`num ${o.time_to_detection_days > 7 ? 'text-warn' : ''}`}>
+                        {o.time_to_detection_days ?? '—'}
+                      </td>
+                      {canEdit && (
+                        <td className="actions-col">
+                          <EditBtn   onClick={() => setEditRecord(o)}   />
+                          <DeleteBtn onClick={() => setDeleteRecord(o)} />
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
 
       {editRecord && (
         <EditRecordModal

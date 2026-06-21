@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { getDiseaseList, YEARS } from '../../data/dataService'
 import EditRecordModal from '../../components/EditRecordModal'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import PageTabs from '../../components/PageTabs'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer,
@@ -67,9 +68,18 @@ export default function DiseaseDashboard() {
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
 
+  const [view,         setView]         = useState('charts')
   const [focusDisease, setFocusDisease] = useState('All')
   const [editRecord,   setEditRecord]   = useState(null)
   const [deleteRecord, setDeleteRecord] = useState(null)
+
+  // All surveillance rows for this country — used by table tab
+  const allSurvRows = useMemo(() => {
+    if (!selectedIso) return []
+    return state.surveillance
+      .filter(s => s.iso_3_code === selectedIso)
+      .sort((a, b) => b.year - a.year || a.disease.localeCompare(b.disease))
+  }, [state.surveillance, selectedIso])
 
   const allDiseases = useMemo(() => getDiseaseList(), [])
 
@@ -130,6 +140,11 @@ export default function DiseaseDashboard() {
         <h1 className="page-title">Disease Surveillance</h1>
         <p className="page-desc">Notifiable disease data · {selectedYear}</p>
       </div>
+
+      <PageTabs view={view} onChange={setView} />
+
+      {/* ── Charts tab ─────────────────────────────────────────────────── */}
+      {view === 'charts' && <>
 
       {/* Summary table */}
       <section className="section">
@@ -260,6 +275,61 @@ export default function DiseaseDashboard() {
         </div>
       </section>
 
+      </> /* end charts tab */}
+
+      {/* ── Data Table tab ─────────────────────────────────────────────── */}
+      {view === 'table' && (
+        <section className="section">
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Disease Surveillance — All Years</h2>
+              <span className="card-subtitle">{allSurvRows.length} records for {selectedIso}</span>
+            </div>
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th>Disease</th>
+                    <th>Cases Reported</th>
+                    <th>Deaths Reported</th>
+                    <th>Attack Rate / 100k</th>
+                    <th>CFR (%)</th>
+                    {canEdit && <th className="actions-col">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {allSurvRows.length === 0 && (
+                    <tr><td colSpan={canEdit ? 7 : 6} className="table-empty">No surveillance data found</td></tr>
+                  )}
+                  {allSurvRows.map(d => (
+                    <tr key={`${d.year}-${d.disease}`} className={d.year === selectedYear ? 'row-highlighted' : ''}>
+                      <td><strong>{d.year}</strong>{d.year === selectedYear && <span className="year-badge">selected</span>}</td>
+                      <td>
+                        <span className="disease-dot" style={{ background: DISEASE_COLORS[d.disease] || DEFAULT_COLOR }} />
+                        {d.disease}
+                      </td>
+                      <td className="num">{d.cases_reported?.toLocaleString()}</td>
+                      <td className="num">{d.deaths_reported?.toLocaleString()}</td>
+                      <td className="num">{d.attack_rate_per_100k?.toFixed(3)}</td>
+                      <td className={`num ${d.case_fatality_ratio_pct > 10 ? 'text-danger' : d.case_fatality_ratio_pct > 5 ? 'text-warn' : ''}`}>
+                        {d.case_fatality_ratio_pct?.toFixed(2)}%
+                      </td>
+                      {canEdit && (
+                        <td className="actions-col">
+                          <EditBtn   onClick={() => setEditRecord(d)}   />
+                          <DeleteBtn onClick={() => setDeleteRecord(d)} />
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
+
       {editRecord && (
         <EditRecordModal
           record={editRecord}
@@ -272,7 +342,7 @@ export default function DiseaseDashboard() {
       {deleteRecord && (
         <ConfirmDialog
           title="Delete Surveillance Record"
-          message={`Delete ${deleteRecord.disease} data for ${selectedYear}? This cannot be undone.`}
+          message={`Delete ${deleteRecord.disease} data for ${deleteRecord.year}? This cannot be undone.`}
           onConfirm={handleConfirmDelete}
           onCancel={() => setDeleteRecord(null)}
         />

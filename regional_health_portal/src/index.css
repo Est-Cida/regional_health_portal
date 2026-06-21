@@ -1433,6 +1433,43 @@ body {
 /* ── card-filters flex ───────────────────────────────────────────────────── */
 .card-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
+/* ── Page tab bar ────────────────────────────────────────────────────────── */
+
+.page-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #E5EAF0;
+  margin: 0 0 20px;
+}
+
+.page-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 20px 10px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--who-muted);
+  cursor: pointer;
+  border-bottom: 2.5px solid transparent;
+  margin-bottom: -2px;
+  transition: color .15s, border-color .15s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.page-tab.active {
+  color: var(--who-blue);
+  border-bottom-color: var(--who-blue);
+  background: #F5F9FF;
+}
+
+.page-tab:not(.active):hover { color: var(--who-dark); background: #F8FAFC; }
+
+.page-tab-icon { font-size: 14px; }
+
 /* ── Regional Map ────────────────────────────────────────────────────────── */
 
 .regional-map-wrap { position: relative; }

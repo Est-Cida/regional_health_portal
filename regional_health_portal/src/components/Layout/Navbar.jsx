@@ -34,7 +34,7 @@ export default function Navbar() {
           </svg> */}
           {/* <img src="/WHO-icon.png" alt="WHO Logo" /> */}
         </span>
-        <span className="navbar-title">Regional Health Portal</span>
+        <span className="navbar-title" >Regional Health Portal</span>
       </div>
 
       <div className="navbar-right">

@@ -4,6 +4,7 @@ import { useDataStore, rowId } from '../../context/DataStore'
 import { useAuth } from '../../context/AuthContext'
 import EditRecordModal from '../../components/EditRecordModal'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import PageTabs from '../../components/PageTabs'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, BarChart, Bar,
@@ -81,6 +82,7 @@ export default function LaboratoryDashboard() {
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
 
+  const [view,         setView]         = useState('charts')
   const [editRecord,   setEditRecord]   = useState(null)
   const [deleteRecord, setDeleteRecord] = useState(null)
 
@@ -115,7 +117,11 @@ export default function LaboratoryDashboard() {
         <p className="page-desc">Lab infrastructure, accreditation &amp; diagnostic output · {selectedYear}</p>
       </div>
 
-      {/* KPI cards + gauge */}
+      <PageTabs view={view} onChange={setView} />
+
+      {/* ── Charts tab ──────────────────────────────────────────────── */}
+      {view === 'charts' && <>
+
       <section className="section">
         <div className="lab-overview-grid">
           <AccreditationGauge value={current?.iso15189_accreditation_pct} />
@@ -148,7 +154,6 @@ export default function LaboratoryDashboard() {
         </div>
       </section>
 
-      {/* Trend charts */}
       <section className="section">
         <div className="charts-grid">
           <div className="card">
@@ -200,49 +205,59 @@ export default function LaboratoryDashboard() {
         </div>
       </section>
 
-      {/* Year-by-year data table */}
-      <section className="section">
-        <div className="card">
-          <div className="card-header"><h2 className="card-title">Laboratory Data by Year</h2></div>
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Year</th>
-                  <th>Public Labs</th>
-                  <th>Accredited Labs</th>
-                  <th>Accreditation %</th>
-                  <th>Avg. Turnaround (days)</th>
-                  <th>Tests / 100k</th>
-                  {canEdit && <th className="actions-col">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {allYears.map(r => (
-                  <tr key={r.year} className={r.year === selectedYear ? 'row-highlighted' : ''}>
-                    <td><strong>{r.year}</strong>{r.year === selectedYear && <span className="year-badge">selected</span>}</td>
-                    <td className="num">{r.total_public_labs}</td>
-                    <td className="num">{r.labs_iso15189_accredited}</td>
-                    <td className={`num ${r.iso15189_accreditation_pct >= 80 ? 'text-success' : r.iso15189_accreditation_pct < 50 ? 'text-danger' : 'text-warn'}`}>
-                      {r.iso15189_accreditation_pct?.toFixed(1)}%
-                    </td>
-                    <td className={`num ${r.avg_turnaround_time_days > 5 ? 'text-warn' : ''}`}>
-                      {r.avg_turnaround_time_days?.toFixed(1)}
-                    </td>
-                    <td className="num">{r.diagnostic_tests_per_100k}</td>
-                    {canEdit && (
-                      <td className="actions-col">
-                        <EditBtn   onClick={() => setEditRecord(r)}   />
-                        <DeleteBtn onClick={() => setDeleteRecord(r)} />
-                      </td>
-                    )}
+      </>}
+
+      {/* ── Data Table tab ─────────────────────────────────────────── */}
+      {view === 'table' && (
+        <section className="section">
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Laboratory Data — All Years</h2>
+              <span className="card-subtitle">{allYears.length} records for {selectedIso}</span>
+            </div>
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th>Public Labs</th>
+                    <th>Accredited Labs</th>
+                    <th>Accreditation %</th>
+                    <th>Avg. Turnaround (days)</th>
+                    <th>Tests / 100k</th>
+                    {canEdit && <th className="actions-col">Actions</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {allYears.length === 0 && (
+                    <tr><td colSpan={canEdit ? 7 : 6} className="table-empty">No laboratory data found</td></tr>
+                  )}
+                  {allYears.map(r => (
+                    <tr key={r.year} className={r.year === selectedYear ? 'row-highlighted' : ''}>
+                      <td><strong>{r.year}</strong>{r.year === selectedYear && <span className="year-badge">selected</span>}</td>
+                      <td className="num">{r.total_public_labs}</td>
+                      <td className="num">{r.labs_iso15189_accredited}</td>
+                      <td className={`num ${r.iso15189_accreditation_pct >= 80 ? 'text-success' : r.iso15189_accreditation_pct < 50 ? 'text-danger' : 'text-warn'}`}>
+                        {r.iso15189_accreditation_pct?.toFixed(1)}%
+                      </td>
+                      <td className={`num ${r.avg_turnaround_time_days > 5 ? 'text-warn' : ''}`}>
+                        {r.avg_turnaround_time_days?.toFixed(1)}
+                      </td>
+                      <td className="num">{r.diagnostic_tests_per_100k}</td>
+                      {canEdit && (
+                        <td className="actions-col">
+                          <EditBtn   onClick={() => setEditRecord(r)}   />
+                          <DeleteBtn onClick={() => setDeleteRecord(r)} />
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {editRecord && (
         <EditRecordModal

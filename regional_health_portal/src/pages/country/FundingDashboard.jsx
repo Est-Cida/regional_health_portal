@@ -4,6 +4,7 @@ import { useDataStore, rowId } from '../../context/DataStore'
 import { useAuth } from '../../context/AuthContext'
 import EditRecordModal from '../../components/EditRecordModal'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import PageTabs from '../../components/PageTabs'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, Cell,
@@ -55,6 +56,7 @@ export default function FundingDashboard() {
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
 
+  const [view,         setView]         = useState('charts')
   const [editRecord,   setEditRecord]   = useState(null)
   const [deleteRecord, setDeleteRecord] = useState(null)
 
@@ -80,7 +82,11 @@ export default function FundingDashboard() {
         <p className="page-desc">Domestic &amp; external health funding · {selectedYear}</p>
       </div>
 
-      {/* KPI cards */}
+      <PageTabs view={view} onChange={setView} />
+
+      {/* ── Charts tab ──────────────────────────────────────────────── */}
+      {view === 'charts' && <>
+
       <section className="section">
         <div className="kpi-grid kpi-grid-4">
           <div className="kpi-card" style={{ borderTop: '4px solid #0071BC', background: '#EBF5FF' }}>
@@ -136,7 +142,6 @@ export default function FundingDashboard() {
         </section>
       )}
 
-      {/* Trend charts */}
       <section className="section">
         <div className="charts-grid">
           <div className="card">
@@ -199,47 +204,57 @@ export default function FundingDashboard() {
         </div>
       </section>
 
-      {/* Data table */}
-      <section className="section">
-        <div className="card">
-          <div className="card-header"><h2 className="card-title">Funding Data by Year</h2></div>
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Year</th>
-                  <th>Total Funding</th>
-                  <th>Domestic</th>
-                  <th>External</th>
-                  <th>Per Capita (USD)</th>
-                  <th>Domestic Share %</th>
-                  {canEdit && <th className="actions-col">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {allYears.map(r => (
-                  <tr key={r.year} className={r.year === selectedYear ? 'row-highlighted' : ''}>
-                    <td><strong>{r.year}</strong>{r.year === selectedYear && <span className="year-badge">selected</span>}</td>
-                    <td className="num">{fmtM(r.total_funding_usd)}</td>
-                    <td className="num">{fmtM(r.domestic_funding_usd)}</td>
-                    <td className="num">{fmtM(r.external_funding_usd)}</td>
-                    <td className="num">${r.funding_per_capita_usd?.toFixed(2)}</td>
-                    <td className={`num ${r.domestic_funding_share_pct >= 50 ? 'text-success' : r.domestic_funding_share_pct < 30 ? 'text-danger' : 'text-warn'}`}>
-                      {r.domestic_funding_share_pct?.toFixed(1)}%
-                    </td>
-                    {canEdit && (
-                      <td className="actions-col">
-                        <EditBtn   onClick={() => setEditRecord(r)}   />
-                        <DeleteBtn onClick={() => setDeleteRecord(r)} />
-                      </td>
-                    )}
+      </>}
+
+      {/* ── Data Table tab ─────────────────────────────────────────── */}
+      {view === 'table' && (
+        <section className="section">
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Funding Data — All Years</h2>
+              <span className="card-subtitle">{allYears.length} records for {selectedIso}</span>
+            </div>
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th>Total Funding</th>
+                    <th>Domestic</th>
+                    <th>External</th>
+                    <th>Per Capita (USD)</th>
+                    <th>Domestic Share %</th>
+                    {canEdit && <th className="actions-col">Actions</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {allYears.length === 0 && (
+                    <tr><td colSpan={canEdit ? 7 : 6} className="table-empty">No funding data found</td></tr>
+                  )}
+                  {allYears.map(r => (
+                    <tr key={r.year} className={r.year === selectedYear ? 'row-highlighted' : ''}>
+                      <td><strong>{r.year}</strong>{r.year === selectedYear && <span className="year-badge">selected</span>}</td>
+                      <td className="num">{fmtM(r.total_funding_usd)}</td>
+                      <td className="num">{fmtM(r.domestic_funding_usd)}</td>
+                      <td className="num">{fmtM(r.external_funding_usd)}</td>
+                      <td className="num">${r.funding_per_capita_usd?.toFixed(2)}</td>
+                      <td className={`num ${r.domestic_funding_share_pct >= 50 ? 'text-success' : r.domestic_funding_share_pct < 30 ? 'text-danger' : 'text-warn'}`}>
+                        {r.domestic_funding_share_pct?.toFixed(1)}%
+                      </td>
+                      {canEdit && (
+                        <td className="actions-col">
+                          <EditBtn   onClick={() => setEditRecord(r)}   />
+                          <DeleteBtn onClick={() => setDeleteRecord(r)} />
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {editRecord && (
         <EditRecordModal

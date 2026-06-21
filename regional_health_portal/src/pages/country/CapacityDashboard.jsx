@@ -4,6 +4,7 @@ import { useDataStore, rowId } from '../../context/DataStore'
 import { useAuth } from '../../context/AuthContext'
 import EditRecordModal from '../../components/EditRecordModal'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import PageTabs from '../../components/PageTabs'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, BarChart, Bar,
@@ -69,10 +70,11 @@ export default function CapacityDashboard() {
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
 
-  const [editWF,   setEditWF]   = useState(null)
-  const [deleteWF, setDeleteWF] = useState(null)
-  const [editRep,  setEditRep]  = useState(null)
-  const [deleteRep, setDeleteRep] = useState(null)
+  const [view,       setView]       = useState('charts')
+  const [editWF,     setEditWF]     = useState(null)
+  const [deleteWF,   setDeleteWF]   = useState(null)
+  const [editRep,    setEditRep]    = useState(null)
+  const [deleteRep,  setDeleteRep]  = useState(null)
 
   const workforceAll = useMemo(
     () => state.workforce.filter(w => w.iso_3_code === selectedIso).sort((a, b) => a.year - b.year),
@@ -101,7 +103,12 @@ export default function CapacityDashboard() {
         <p className="page-desc">Workforce &amp; surveillance reporting · {selectedYear}</p>
       </div>
 
-      {/* ── Workforce ──────────────────────────────────────────────── */}
+      <PageTabs view={view} onChange={setView} />
+
+      {/* ── Charts tab ──────────────────────────────────────────────── */}
+      {view === 'charts' && <>
+
+      {/* Workforce */}
       <section className="section">
         <h2 className="section-heading">Health Workforce</h2>
 
@@ -156,51 +163,9 @@ export default function CapacityDashboard() {
             </ResponsiveContainer>
           </div>
         </div>
-
-        {/* Workforce data table */}
-        <div className="card">
-          <div className="card-header"><h2 className="card-title">Workforce Data by Year</h2></div>
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Year</th>
-                  <th>Epidemiologists</th>
-                  <th>Epi / 100k</th>
-                  <th>FELTP Trained</th>
-                  <th>FELTP %</th>
-                  <th>Lab Technicians</th>
-                  <th>Lab Tech / 100k</th>
-                  {canEdit && <th className="actions-col">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {workforceAll.map(r => (
-                  <tr key={r.year} className={r.year === selectedYear ? 'row-highlighted' : ''}>
-                    <td><strong>{r.year}</strong>{r.year === selectedYear && <span className="year-badge">selected</span>}</td>
-                    <td className="num">{r.epidemiologists_total}</td>
-                    <td className="num">{r.epidemiologists_per_100k?.toFixed(3)}</td>
-                    <td className="num">{r.feltp_trained_total}</td>
-                    <td className={`num ${r.feltp_trained_pct >= 50 ? 'text-success' : 'text-warn'}`}>
-                      {r.feltp_trained_pct?.toFixed(1)}%
-                    </td>
-                    <td className="num">{r.lab_technicians_total}</td>
-                    <td className="num">{r.lab_technicians_per_100k?.toFixed(2)}</td>
-                    {canEdit && (
-                      <td className="actions-col">
-                        <EditBtn   onClick={() => setEditWF(r)}   />
-                        <DeleteBtn onClick={() => setDeleteWF(r)} />
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </section>
 
-      {/* ── Reporting Metrics ──────────────────────────────────────── */}
+      {/* Reporting Metrics */}
       <section className="section">
         <h2 className="section-heading">Surveillance Reporting — {selectedYear}</h2>
 
@@ -225,53 +190,115 @@ export default function CapacityDashboard() {
               <YAxis tickFormatter={v => `${v}%`} domain={[0, 100]} tick={{ fontSize: 11, fill: '#6B7C93' }} />
               <Tooltip content={<ChartTooltip />} formatter={v => [`${v?.toFixed(1)}%`]} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line type="monotone" dataKey="timeliness_pct"              name="Timeliness"      stroke="#0071BC" strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="completeness_pct"            name="Completeness"    stroke="#059669" strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="idsr_weekly_compliance_pct"  name="IDSR Compliance" stroke="#D97706" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="timeliness_pct"             name="Timeliness"      stroke="#0071BC" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="completeness_pct"           name="Completeness"    stroke="#059669" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="idsr_weekly_compliance_pct" name="IDSR Compliance" stroke="#D97706" strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
-
-        {/* Reporting data table */}
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="card-header"><h2 className="card-title">Reporting Data by Year</h2></div>
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Year</th>
-                  <th>Timeliness %</th>
-                  <th>Completeness %</th>
-                  <th>IDSR Compliance %</th>
-                  {canEdit && <th className="actions-col">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {reportingAll.map(r => (
-                  <tr key={r.year} className={r.year === selectedYear ? 'row-highlighted' : ''}>
-                    <td><strong>{r.year}</strong>{r.year === selectedYear && <span className="year-badge">selected</span>}</td>
-                    <td className={`num ${r.timeliness_pct >= 80 ? 'text-success' : r.timeliness_pct < 50 ? 'text-danger' : 'text-warn'}`}>
-                      {r.timeliness_pct?.toFixed(1)}%
-                    </td>
-                    <td className={`num ${r.completeness_pct >= 80 ? 'text-success' : r.completeness_pct < 50 ? 'text-danger' : 'text-warn'}`}>
-                      {r.completeness_pct?.toFixed(1)}%
-                    </td>
-                    <td className={`num ${r.idsr_weekly_compliance_pct >= 80 ? 'text-success' : r.idsr_weekly_compliance_pct < 50 ? 'text-danger' : 'text-warn'}`}>
-                      {r.idsr_weekly_compliance_pct?.toFixed(1)}%
-                    </td>
-                    {canEdit && (
-                      <td className="actions-col">
-                        <EditBtn   onClick={() => setEditRep(r)}   />
-                        <DeleteBtn onClick={() => setDeleteRep(r)} />
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </section>
+
+      </>}
+
+      {/* ── Data Table tab ─────────────────────────────────────────── */}
+      {view === 'table' && (
+        <section className="section">
+
+          {/* Workforce table */}
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div className="card-header">
+              <h2 className="card-title">Workforce Data — All Years</h2>
+              <span className="card-subtitle">{workforceAll.length} records for {selectedIso}</span>
+            </div>
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th>Epidemiologists</th>
+                    <th>Epi / 100k</th>
+                    <th>FELTP Trained</th>
+                    <th>FELTP %</th>
+                    <th>Lab Technicians</th>
+                    <th>Lab Tech / 100k</th>
+                    {canEdit && <th className="actions-col">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {workforceAll.length === 0 && (
+                    <tr><td colSpan={canEdit ? 8 : 7} className="table-empty">No workforce data found</td></tr>
+                  )}
+                  {workforceAll.map(r => (
+                    <tr key={r.year} className={r.year === selectedYear ? 'row-highlighted' : ''}>
+                      <td><strong>{r.year}</strong>{r.year === selectedYear && <span className="year-badge">selected</span>}</td>
+                      <td className="num">{r.epidemiologists_total}</td>
+                      <td className="num">{r.epidemiologists_per_100k?.toFixed(3)}</td>
+                      <td className="num">{r.feltp_trained_total}</td>
+                      <td className={`num ${r.feltp_trained_pct >= 50 ? 'text-success' : 'text-warn'}`}>
+                        {r.feltp_trained_pct?.toFixed(1)}%
+                      </td>
+                      <td className="num">{r.lab_technicians_total}</td>
+                      <td className="num">{r.lab_technicians_per_100k?.toFixed(2)}</td>
+                      {canEdit && (
+                        <td className="actions-col">
+                          <EditBtn   onClick={() => setEditWF(r)}   />
+                          <DeleteBtn onClick={() => setDeleteWF(r)} />
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Reporting table */}
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Reporting Data — All Years</h2>
+              <span className="card-subtitle">{reportingAll.length} records for {selectedIso}</span>
+            </div>
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th>Timeliness %</th>
+                    <th>Completeness %</th>
+                    <th>IDSR Compliance %</th>
+                    {canEdit && <th className="actions-col">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportingAll.length === 0 && (
+                    <tr><td colSpan={canEdit ? 5 : 4} className="table-empty">No reporting data found</td></tr>
+                  )}
+                  {reportingAll.map(r => (
+                    <tr key={r.year} className={r.year === selectedYear ? 'row-highlighted' : ''}>
+                      <td><strong>{r.year}</strong>{r.year === selectedYear && <span className="year-badge">selected</span>}</td>
+                      <td className={`num ${r.timeliness_pct >= 80 ? 'text-success' : r.timeliness_pct < 50 ? 'text-danger' : 'text-warn'}`}>
+                        {r.timeliness_pct?.toFixed(1)}%
+                      </td>
+                      <td className={`num ${r.completeness_pct >= 80 ? 'text-success' : r.completeness_pct < 50 ? 'text-danger' : 'text-warn'}`}>
+                        {r.completeness_pct?.toFixed(1)}%
+                      </td>
+                      <td className={`num ${r.idsr_weekly_compliance_pct >= 80 ? 'text-success' : r.idsr_weekly_compliance_pct < 50 ? 'text-danger' : 'text-warn'}`}>
+                        {r.idsr_weekly_compliance_pct?.toFixed(1)}%
+                      </td>
+                      {canEdit && (
+                        <td className="actions-col">
+                          <EditBtn   onClick={() => setEditRep(r)}   />
+                          <DeleteBtn onClick={() => setDeleteRep(r)} />
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Workforce modals */}
       {editWF && (
