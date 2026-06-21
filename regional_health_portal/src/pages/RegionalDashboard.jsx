@@ -28,16 +28,27 @@ export default function RegionalDashboard() {
 
   const availableSubregions = user.role === 'super_admin' ? SUBREGIONS : [user.subregion]
 
-  const [selectedSubregion, setSelectedSubregion] = useState(availableSubregions[0])
-  const [selectedYear,      setSelectedYear]       = useState(2024)
-  const [selectedDiseases,  setSelectedDiseases]  = useState([...ALL_DISEASES])
-  const [mapMetric,         setMapMetric]          = useState('totalCases')
+  const [selectedSubregions, setSelectedSubregions] = useState([availableSubregions[0]])
+  const [selectedYear,       setSelectedYear]       = useState(2024)
+  const [selectedDiseases,   setSelectedDiseases]   = useState([...ALL_DISEASES])
+  const [mapMetric,          setMapMetric]          = useState('totalCases')
 
-  const allDiseasesSelected = selectedDiseases.length === ALL_DISEASES.length
+  const allSubregionsSelected = selectedSubregions.length === availableSubregions.length
+  const allDiseasesSelected   = selectedDiseases.length   === ALL_DISEASES.length
   const yearLabel = selectedYear === 'all' ? 'All Years' : selectedYear
 
+  // Title reflects current selection
+  const regionLabel = useMemo(() => {
+    if (allSubregionsSelected || !selectedSubregions.length) return 'WHO AFRO'
+    if (selectedSubregions.length === 1) return `${selectedSubregions[0]} Africa`
+    return `${selectedSubregions.length} Sub-regions`
+  }, [selectedSubregions, allSubregionsSelected])
+
   const overview = useMemo(() => {
-    const countries = getCountriesBySubregion(selectedSubregion)
+    const activeSubs = (allSubregionsSelected || !selectedSubregions.length)
+      ? availableSubregions
+      : selectedSubregions
+    const countries = activeSubs.flatMap(sub => getCountriesBySubregion(sub))
     const years = selectedYear === 'all' ? YEARS : [Number(selectedYear)]
 
     return countries.map(c => {
@@ -62,6 +73,7 @@ export default function RegionalDashboard() {
       return {
         iso3,
         country_name:  c.country_name,
+        subregion:     c.afro_subregion,
         priority:      c.priority_country,
         lat:           Number(c.latitude),
         lng:           Number(c.longitude),
@@ -71,7 +83,7 @@ export default function RegionalDashboard() {
         outbreakCount: obsRows.length,
       }
     }).sort((a, b) => b.totalCases - a.totalCases)
-  }, [selectedSubregion, selectedYear, selectedDiseases, allDiseasesSelected])
+  }, [selectedSubregions, allSubregionsSelected, selectedYear, selectedDiseases, allDiseasesSelected, availableSubregions])
 
   const totalCases  = overview.reduce((s, c) => s + c.totalCases,    0)
   const totalDeaths = overview.reduce((s, c) => s + c.totalDeaths,   0)
@@ -80,6 +92,9 @@ export default function RegionalDashboard() {
   const diseaseSubtitle = allDiseasesSelected
     ? 'All countries, all diseases'
     : `All countries, ${selectedDiseases.length} disease${selectedDiseases.length !== 1 ? 's' : ''}`
+
+  // Pass the first selected subregion to map for centering; fall back to first available
+  const mapSubregion = selectedSubregions[0] ?? availableSubregions[0]
 
   return (
     <div className="app-layout">
@@ -92,7 +107,7 @@ export default function RegionalDashboard() {
           <div className="page-header">
             <div className="page-header-left">
               <div className="page-breadcrumb">Regional Overview</div>
-              <h1 className="page-title">{selectedSubregion} Africa Regional Dashboard</h1>
+              <h1 className="page-title">{regionLabel} Regional Dashboard</h1>
               <p className="page-desc">
                 {overview.length} countries · {yearLabel} surveillance data
               </p>
@@ -101,15 +116,13 @@ export default function RegionalDashboard() {
               {user.role === 'super_admin' && (
                 <div className="control-group">
                   <label className="control-label">Sub-region</label>
-                  <select
-                    className="select-control"
-                    value={selectedSubregion}
-                    onChange={e => setSelectedSubregion(e.target.value)}
-                  >
-                    {availableSubregions.map(s => (
-                      <option key={s} value={s}>{s} Africa</option>
-                    ))}
-                  </select>
+                  <MultiSelectDropdown
+                    options={availableSubregions.map(s => ({ value: s, label: `${s} Africa` }))}
+                    selected={selectedSubregions}
+                    onChange={setSelectedSubregions}
+                    placeholder="Select sub-region…"
+                    allLabel="All Sub-regions"
+                  />
                 </div>
               )}
               <div className="control-group">
@@ -167,7 +180,7 @@ export default function RegionalDashboard() {
                 <div>
                   <h2 className="card-title">Geographic Distribution</h2>
                   <span className="card-subtitle">
-                    {selectedSubregion} Africa · {yearLabel} · click a country for details
+                    {regionLabel} · {yearLabel} · click a country for details
                   </span>
                 </div>
                 <div className="map-metric-toggle">
@@ -187,7 +200,7 @@ export default function RegionalDashboard() {
                 overview={overview}
                 metric={mapMetric}
                 year={selectedYear}
-                subregion={selectedSubregion}
+                subregion={mapSubregion}
               />
             </div>
           </section>
