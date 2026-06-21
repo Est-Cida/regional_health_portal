@@ -8,7 +8,7 @@ import PageTabs from '../../components/PageTabs'
 import { YEARS } from '../../data/dataService'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar,
+  ResponsiveContainer, BarChart, Bar, Legend, Cell,
 } from 'recharts'
 
 const ChartTooltip = ({ active, payload, label }) => {
@@ -72,7 +72,7 @@ function DeleteBtn({ onClick }) {
 }
 
 export default function LaboratoryDashboard() {
-  const { selectedIsos, selectedYears } = useCountry()
+  const { selectedIsos, selectedYears, availableCountries } = useCountry()
   const { state, update, remove } = useDataStore()
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
@@ -130,6 +130,30 @@ export default function LaboratoryDashboard() {
       (!selectedYears.length || selectedYears.includes(r.year))
     ).sort((a, b) => a.year - b.year || a.iso_3_code.localeCompare(b.iso_3_code))
   , [state.labCapacity, selectedIsos, selectedYears])
+
+  const isoToName = useMemo(() => {
+    const map = {}
+    availableCountries.forEach(c => { map[c.iso_3_code] = c.country_name })
+    return map
+  }, [availableCountries])
+
+  // Per-country public labs totals for multi-country comparison chart
+  const labsByCountry = useMemo(() => {
+    if (!multiIso) return []
+    return selectedIsos.map(iso => {
+      const rows = state.labCapacity.filter(r =>
+        r.iso_3_code === iso &&
+        (!selectedYears.length || selectedYears.includes(r.year))
+      )
+      const n = rows.length
+      return {
+        country:                  isoToName[iso] || iso,
+        total_public_labs:        rows.reduce((s, r) => s + (r.total_public_labs        || 0), 0),
+        labs_iso15189_accredited: rows.reduce((s, r) => s + (r.labs_iso15189_accredited || 0), 0),
+        accreditation_pct:        n ? rows.reduce((s, r) => s + (r.iso15189_accreditation_pct || 0), 0) / n : 0,
+      }
+    }).sort((a, b) => b.total_public_labs - a.total_public_labs)
+  }, [state.labCapacity, selectedIsos, selectedYears, isoToName, multiIso])
 
   if (!selectedIsos.length) return <div className="page-empty">Select a country above.</div>
 
@@ -217,6 +241,54 @@ export default function LaboratoryDashboard() {
           </ResponsiveContainer>
         </div>
       </section>
+
+      {multiIso && labsByCountry.length > 0 && (
+        <section className="section">
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Public Labs by Country — {yLabel}</h2>
+              <span className="card-subtitle">Total labs · accredited labs · highest to lowest</span>
+            </div>
+            <ResponsiveContainer width="100%" height={Math.max(240, labsByCountry.length * 42) + 48}>
+              <BarChart
+                data={labsByCountry}
+                layout="vertical"
+                margin={{ top: 48, right: 40, left: 4, bottom: 4 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7C93' }} />
+                <YAxis
+                  type="category"
+                  dataKey="country"
+                  width={160}
+                  tick={{ fontSize: 11, fill: '#1A2B4A' }}
+                />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null
+                    const d = payload[0]?.payload
+                    return (
+                      <div className="chart-tooltip">
+                        <p className="tooltip-label">{d?.country}</p>
+                        <p>Total Labs: <strong>{d?.total_public_labs}</strong></p>
+                        <p>Accredited: <strong>{d?.labs_iso15189_accredited}</strong></p>
+                        <p>Accreditation: <strong>{d?.accreditation_pct?.toFixed(1)}%</strong></p>
+                      </div>
+                    )
+                  }}
+                />
+                <Legend
+                  verticalAlign="top"
+                  height={40}
+                  wrapperStyle={{ fontSize: 11, top: 0 }}
+                />
+                <Bar dataKey="total_public_labs"        name="Total Public Labs"    fill="#0071BC" radius={[0, 4, 4, 0]} stackId="a" />
+                <Bar dataKey="labs_iso15189_accredited" name="ISO 15189 Accredited" fill="#059669" radius={[0, 4, 4, 0]} stackId="b" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      )}
 
       </>}
 
