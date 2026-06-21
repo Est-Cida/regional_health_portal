@@ -1597,3 +1597,72 @@ body {
   font-style: italic;
   font-size: 10px;
 }
+
+/* ── Multi-Select Dropdown ───────────────────────────────────────────────── */
+
+.msd-wrap { position: relative; }
+
+.msd-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  min-width: 150px;
+  background: white;
+  border: 1.5px solid var(--who-border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--who-dark);
+  cursor: pointer;
+  transition: border-color .15s;
+  text-align: left;
+  white-space: nowrap;
+}
+.msd-trigger:hover, .msd-trigger.open { border-color: var(--who-blue); }
+
+.msd-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+
+.msd-chevron { flex-shrink: 0; color: var(--who-muted); transition: transform .2s; }
+.msd-chevron.flipped { transform: rotate(180deg); }
+
+.msd-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 190px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: white;
+  border: 1.5px solid var(--who-border);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.1);
+  z-index: 300;
+  padding: 4px 0;
+}
+
+.msd-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--who-dark);
+  user-select: none;
+  transition: background .1s;
+}
+.msd-option:hover { background: #F0F4F8; }
+.msd-option-all   { font-weight: 600; }
+
+.msd-checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--who-blue);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.msd-option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.msd-divider { height: 1px; background: var(--who-border); margin: 4px 0; }

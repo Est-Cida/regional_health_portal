@@ -7,98 +7,104 @@ import KPICard from '../../components/cards/KPICard'
 import DiseaseBarChart from '../../components/charts/DiseaseBarChart'
 import TrendLineChart from '../../components/charts/TrendLineChart'
 import PageTabs from '../../components/PageTabs'
-import {
-  getSurveillanceSummary,
-  getSurveillanceTrend,
-  getOutbreaks,
-  getLabCapacity,
-  YEARS,
-} from '../../data/dataService'
+import { YEARS } from '../../data/dataService'
 
 const fmtM = v => v != null ? `$${(v / 1_000_000).toFixed(1)}M` : '—'
 
+function yearLabel(selectedYears) {
+  if (!selectedYears.length || selectedYears.length === YEARS.length) return 'All Years'
+  if (selectedYears.length === 1) return String(selectedYears[0])
+  return `${selectedYears.length} Years`
+}
+
 export default function CountryOverview() {
-  const { selectedIso, selectedYear } = useCountry()
+  const { selectedIsos, selectedYears } = useCountry()
   const { state } = useDataStore()
   const { user } = useAuth()
   const navigate = useNavigate()
 
   const [view, setView] = useState('charts')
 
-  const yearLabel = selectedYear === 'all' ? 'All Years' : selectedYear
+  const yLabel = yearLabel(selectedYears)
 
+  // All surveillance rows for selected countries
+  const filteredSurv = useMemo(() =>
+    state.surveillance.filter(s =>
+      (!selectedIsos.length || selectedIsos.includes(s.iso_3_code))
+    ), [state.surveillance, selectedIsos])
+
+  // Summary for selected years (KPI cards + disease bar chart)
   const summary = useMemo(() => {
-    if (!selectedIso) return null
-    if (selectedYear === 'all') {
-      const rows = state.surveillance.filter(s => s.iso_3_code === selectedIso)
-      if (!rows.length) return null
-      const n = rows.length
-      const byDisease = {}
-      rows.forEach(r => {
-        if (!byDisease[r.disease]) byDisease[r.disease] = { disease: r.disease, cases_reported: 0 }
-        byDisease[r.disease].cases_reported += r.cases_reported || 0
-      })
-      return {
-        totalCases:     rows.reduce((s, r) => s + (r.cases_reported           || 0), 0),
-        totalDeaths:    rows.reduce((s, r) => s + (r.deaths_reported          || 0), 0),
-        avgAttackRate:  rows.reduce((s, r) => s + (r.attack_rate_per_100k     || 0), 0) / n,
-        avgCFR:         rows.reduce((s, r) => s + (r.case_fatality_ratio_pct  || 0), 0) / n,
-        diseaseBreakdown: Object.values(byDisease),
-      }
-    }
-    return getSurveillanceSummary(selectedIso, selectedYear)
-  }, [selectedIso, selectedYear, state.surveillance])
-
-  const trend     = useMemo(() => selectedIso ? getSurveillanceTrend(selectedIso) : [], [selectedIso])
-
-  const outbreaks = useMemo(() => {
-    if (!selectedIso) return []
-    if (selectedYear === 'all') return state.outbreaks.filter(o => o.iso_3_code === selectedIso)
-    return getOutbreaks(selectedIso, selectedYear)
-  }, [selectedIso, selectedYear, state.outbreaks])
-
-  const labData = useMemo(() => {
-    if (!selectedIso) return null
-    if (selectedYear === 'all') {
-      const rows = state.labCapacity.filter(l => l.iso_3_code === selectedIso)
-      if (!rows.length) return null
-      return { iso15189_accreditation_pct: rows.reduce((s, r) => s + (r.iso15189_accreditation_pct || 0), 0) / rows.length }
-    }
-    return getLabCapacity(selectedIso, selectedYear)
-  }, [selectedIso, selectedYear, state.labCapacity])
-
-  const prevSummary = useMemo(() => {
-    if (!selectedIso || selectedYear === 'all' || selectedYear <= 2021) return null
-    return getSurveillanceSummary(selectedIso, selectedYear - 1)
-  }, [selectedIso, selectedYear])
-
-  const caseTrend  = summary && prevSummary?.totalCases  > 0
-    ? ((summary.totalCases  - prevSummary.totalCases)  / prevSummary.totalCases)  * 100 : undefined
-  const deathTrend = summary && prevSummary?.totalDeaths > 0
-    ? ((summary.totalDeaths - prevSummary.totalDeaths) / prevSummary.totalDeaths) * 100 : undefined
-
-  // Multi-year summary from DataStore for the table tab
-  const summaryRows = useMemo(() => {
-    if (!selectedIso) return []
-    return [...YEARS].reverse().map(year => {
-      const survRows     = state.surveillance.filter(s => s.iso_3_code === selectedIso && s.year === year)
-      const totalCases   = survRows.reduce((s, r) => s + (r.cases_reported  || 0), 0)
-      const totalDeaths  = survRows.reduce((s, r) => s + (r.deaths_reported || 0), 0)
-      const avgCFR       = survRows.length
-        ? survRows.reduce((s, r) => s + (r.case_fatality_ratio_pct || 0), 0) / survRows.length : 0
-      const outbreakCount = state.outbreaks.filter(o => o.iso_3_code === selectedIso && o.year === year).length
-      const lab  = state.labCapacity.find(l => l.iso_3_code === selectedIso && l.year === year)
-      const wf   = state.workforce.find(w => w.iso_3_code === selectedIso && w.year === year)
-      const fund = state.funding.find(f => f.iso_3_code === selectedIso && f.year === year)
-      return { year, totalCases, totalDeaths, avgCFR, outbreakCount,
-        accreditation: lab?.iso15189_accreditation_pct  ?? null,
-        epidemiologists: wf?.epidemiologists_total      ?? null,
-        totalFunding: fund?.total_funding_usd           ?? null,
-      }
+    const rows = filteredSurv.filter(s =>
+      !selectedYears.length || selectedYears.includes(s.year)
+    )
+    if (!rows.length) return null
+    const n = rows.length
+    const byDisease = {}
+    rows.forEach(r => {
+      if (!byDisease[r.disease]) byDisease[r.disease] = { disease: r.disease, cases_reported: 0 }
+      byDisease[r.disease].cases_reported += r.cases_reported || 0
     })
-  }, [state, selectedIso])
+    return {
+      totalCases:       rows.reduce((s, r) => s + (r.cases_reported          || 0), 0),
+      totalDeaths:      rows.reduce((s, r) => s + (r.deaths_reported         || 0), 0),
+      avgAttackRate:    rows.reduce((s, r) => s + (r.attack_rate_per_100k    || 0), 0) / n,
+      avgCFR:           rows.reduce((s, r) => s + (r.case_fatality_ratio_pct || 0), 0) / n,
+      diseaseBreakdown: Object.values(byDisease),
+    }
+  }, [filteredSurv, selectedYears])
 
-  if (!selectedIso) return <div className="page-empty">Select a country to view its dashboard.</div>
+  // 5-year trend (for TrendLineChart) — sum across selected countries per year
+  const trend = useMemo(() =>
+    YEARS.map(year => {
+      const rows = filteredSurv.filter(s => s.year === year)
+      return {
+        year,
+        totalCases:  rows.reduce((s, r) => s + (r.cases_reported  || 0), 0),
+        totalDeaths: rows.reduce((s, r) => s + (r.deaths_reported || 0), 0),
+      }
+    }), [filteredSurv])
+
+  // Outbreaks count for selected countries + years
+  const outbreaks = useMemo(() =>
+    state.outbreaks.filter(o =>
+      (!selectedIsos.length  || selectedIsos.includes(o.iso_3_code)) &&
+      (!selectedYears.length || selectedYears.includes(o.year))
+    ), [state.outbreaks, selectedIsos, selectedYears])
+
+  // Average lab accreditation for selected countries + years
+  const labData = useMemo(() => {
+    const rows = state.labCapacity.filter(l =>
+      (!selectedIsos.length  || selectedIsos.includes(l.iso_3_code)) &&
+      (!selectedYears.length || selectedYears.includes(l.year))
+    )
+    if (!rows.length) return null
+    return { iso15189_accreditation_pct: rows.reduce((s, r) => s + (r.iso15189_accreditation_pct || 0), 0) / rows.length }
+  }, [state.labCapacity, selectedIsos, selectedYears])
+
+  // Multi-year summary rows for the Summary Table tab
+  const summaryRows = useMemo(() =>
+    [...YEARS].reverse().map(year => {
+      const survRows = state.surveillance.filter(s =>
+        (!selectedIsos.length || selectedIsos.includes(s.iso_3_code)) && s.year === year
+      )
+      const labRows  = state.labCapacity.filter(l => (!selectedIsos.length || selectedIsos.includes(l.iso_3_code)) && l.year === year)
+      const wfRows   = state.workforce.filter(w   => (!selectedIsos.length || selectedIsos.includes(w.iso_3_code)) && w.year === year)
+      const fundRows = state.funding.filter(f     => (!selectedIsos.length || selectedIsos.includes(f.iso_3_code)) && f.year === year)
+      const obCount  = state.outbreaks.filter(o   => (!selectedIsos.length || selectedIsos.includes(o.iso_3_code)) && o.year === year).length
+      return {
+        year,
+        totalCases:     survRows.reduce((s, r) => s + (r.cases_reported          || 0), 0),
+        totalDeaths:    survRows.reduce((s, r) => s + (r.deaths_reported         || 0), 0),
+        avgCFR:         survRows.length ? survRows.reduce((s, r) => s + (r.case_fatality_ratio_pct || 0), 0) / survRows.length : 0,
+        outbreakCount:  obCount,
+        accreditation:  labRows.length  ? labRows.reduce((s, r)  => s + (r.iso15189_accreditation_pct || 0), 0) / labRows.length : null,
+        epidemiologists: wfRows.length  ? Math.round(wfRows.reduce((s, r) => s + (r.epidemiologists_total || 0), 0)) : null,
+        totalFunding:   fundRows.length ? fundRows.reduce((s, r) => s + (r.total_funding_usd || 0), 0) : null,
+      }
+    }), [state, selectedIsos])
+
+  if (!selectedIsos.length) return <div className="page-empty">Select a country to view its dashboard.</div>
 
   return (
     <>
@@ -111,22 +117,21 @@ export default function CountryOverview() {
         ]}
       />
 
-      {/* ── Charts / Overview tab ─────────────────────────────────────── */}
       {view === 'charts' && (
         <>
           <div className="kpi-grid section">
-            <KPICard title="Total Cases"        value={summary?.totalCases?.toLocaleString()}              subtitle="All diseases"               color="blue"   icon="cases"  trend={caseTrend} />
-            <KPICard title="Total Deaths"       value={summary?.totalDeaths?.toLocaleString()}             subtitle="All diseases"               color="red"    icon="deaths" trend={deathTrend} />
+            <KPICard title="Total Cases"        value={summary?.totalCases?.toLocaleString()}              subtitle="All diseases"               color="blue"   icon="cases" />
+            <KPICard title="Total Deaths"       value={summary?.totalDeaths?.toLocaleString()}             subtitle="All diseases"               color="red"    icon="deaths" />
             <KPICard title="Avg. Attack Rate"   value={summary?.avgAttackRate?.toFixed(2)}                 subtitle="per 100,000 population"     color="orange" icon="attack" />
             <KPICard title="Avg. Case Fatality" value={summary ? `${summary.avgCFR?.toFixed(2)}%` : null} subtitle="Case fatality ratio"        color="purple" icon="cfr" />
-            <KPICard title="Outbreaks"          value={outbreaks.length}                                   subtitle={`recorded in ${yearLabel}`} color="teal" icon="alert" />
+            <KPICard title="Outbreaks"          value={outbreaks.length}                                   subtitle={`recorded in ${yLabel}`}    color="teal"   icon="alert" />
             <KPICard title="Lab Accreditation"  value={labData ? `${labData.iso15189_accreditation_pct?.toFixed(1)}%` : null} subtitle="ISO 15189 certified" color="green" icon="lab" />
           </div>
 
           <div className="charts-grid section">
             <div className="card">
               <div className="card-header">
-                <h2 className="card-title">Disease Burden — {yearLabel}</h2>
+                <h2 className="card-title">Disease Burden — {yLabel}</h2>
                 <button className="btn-link" onClick={() => navigate('/country/diseases')}>View detail →</button>
               </div>
               <DiseaseBarChart data={summary?.diseaseBreakdown || []} />
@@ -163,13 +168,14 @@ export default function CountryOverview() {
         </>
       )}
 
-      {/* ── Summary Table tab ─────────────────────────────────────────── */}
       {view === 'table' && (
         <section className="section">
           <div className="card">
             <div className="card-header">
               <h2 className="card-title">Multi-Indicator Summary — All Years</h2>
-              <span className="card-subtitle">All data shown for {selectedIso}</span>
+              <span className="card-subtitle">
+                {selectedIsos.length === 1 ? selectedIsos[0] : `${selectedIsos.length} countries`}
+              </span>
             </div>
             <div className="table-wrapper">
               <table className="data-table">
@@ -187,8 +193,13 @@ export default function CountryOverview() {
                 </thead>
                 <tbody>
                   {summaryRows.map(r => (
-                    <tr key={r.year} className={r.year === selectedYear ? 'row-highlighted' : ''}>
-                      <td><strong>{r.year}</strong>{r.year === selectedYear && <span className="year-badge">selected</span>}</td>
+                    <tr key={r.year} className={selectedYears.includes(r.year) ? 'row-highlighted' : ''}>
+                      <td>
+                        <strong>{r.year}</strong>
+                        {selectedYears.includes(r.year) && selectedYears.length < YEARS.length && (
+                          <span className="year-badge">selected</span>
+                        )}
+                      </td>
                       <td className="num">{r.totalCases.toLocaleString()}</td>
                       <td className="num">{r.totalDeaths.toLocaleString()}</td>
                       <td className={`num ${r.avgCFR > 10 ? 'text-danger' : r.avgCFR > 5 ? 'text-warn' : ''}`}>
