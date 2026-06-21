@@ -1,5 +1,5 @@
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
 } from 'recharts'
 
@@ -14,7 +14,7 @@ const DISEASE_COLORS = {
 }
 const DEFAULT_COLOR = '#6B7C93'
 
-const fmt = (v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
+const fmt = v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
 
 const CustomTooltip = ({ active, payload }) => {
   if (!active || !payload?.length) return null
@@ -22,9 +22,9 @@ const CustomTooltip = ({ active, payload }) => {
   return (
     <div className="chart-tooltip">
       <p className="tooltip-label">{d.disease}</p>
-      <p>Cases: <strong>{d.cases?.toLocaleString()}</strong></p>
-      <p>Deaths: <strong>{d.deaths?.toLocaleString()}</strong></p>
-      <p>CFR: <strong>{d.cfr?.toFixed(1)}%</strong></p>
+      <p>Cases: <strong>{d.cases_reported?.toLocaleString()}</strong></p>
+      {d.deaths_reported != null && <p>Deaths: <strong>{d.deaths_reported?.toLocaleString()}</strong></p>}
+      {d.cfr != null && <p>CFR: <strong>{d.cfr?.toFixed(1)}%</strong></p>}
     </div>
   )
 }
@@ -32,7 +32,7 @@ const CustomTooltip = ({ active, payload }) => {
 export default function DiseaseBarChart({ data = [] }) {
   if (!data.length) return <div className="chart-empty">No data available</div>
 
-  const sorted = [...data].sort((a, b) => b.cases - a.cases)
+  const sorted = [...data].sort((a, b) => (b.cases_reported || 0) - (a.cases_reported || 0))
 
   return (
     <ResponsiveContainer width="100%" height={280}>
@@ -50,12 +50,9 @@ export default function DiseaseBarChart({ data = [] }) {
           width={135}
         />
         <Tooltip content={<CustomTooltip />} />
-        <Bar dataKey="cases" name="Cases" radius={[0, 4, 4, 0]}>
-          {sorted.map((entry) => (
-            <Cell
-              key={entry.disease}
-              fill={DISEASE_COLORS[entry.disease] || DEFAULT_COLOR}
-            />
+        <Bar dataKey="cases_reported" name="Cases" radius={[0, 4, 4, 0]}>
+          {sorted.map(entry => (
+            <Cell key={entry.disease} fill={DISEASE_COLORS[entry.disease] || DEFAULT_COLOR} />
           ))}
         </Bar>
       </BarChart>

@@ -42,15 +42,21 @@ export default function CountryOverview() {
     const n = rows.length
     const byDisease = {}
     rows.forEach(r => {
-      if (!byDisease[r.disease]) byDisease[r.disease] = { disease: r.disease, cases_reported: 0 }
-      byDisease[r.disease].cases_reported += r.cases_reported || 0
+      if (!byDisease[r.disease]) byDisease[r.disease] = { disease: r.disease, cases_reported: 0, deaths_reported: 0, _cfrSum: 0, _n: 0 }
+      byDisease[r.disease].cases_reported  += r.cases_reported          || 0
+      byDisease[r.disease].deaths_reported += r.deaths_reported         || 0
+      byDisease[r.disease]._cfrSum         += r.case_fatality_ratio_pct || 0
+      byDisease[r.disease]._n              += 1
     })
     return {
       totalCases:       rows.reduce((s, r) => s + (r.cases_reported          || 0), 0),
       totalDeaths:      rows.reduce((s, r) => s + (r.deaths_reported         || 0), 0),
       avgAttackRate:    rows.reduce((s, r) => s + (r.attack_rate_per_100k    || 0), 0) / n,
       avgCFR:           rows.reduce((s, r) => s + (r.case_fatality_ratio_pct || 0), 0) / n,
-      diseaseBreakdown: Object.values(byDisease),
+      diseaseBreakdown: Object.values(byDisease).map(({ _cfrSum, _n, ...d }) => ({
+        ...d,
+        cfr: _n > 0 ? _cfrSum / _n : 0,
+      })),
     }
   }, [filteredSurv, selectedYears])
 
