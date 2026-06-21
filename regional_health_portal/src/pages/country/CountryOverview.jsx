@@ -133,20 +133,30 @@ export default function CountryOverview() {
     }).sort((a, b) => b._total - a._total)
   }, [filteredSurv, selectedIsos, selectedYears, activeDiseases, isoToName])
 
-  // Total funding per country (for companion bar — same ordering as burdenByCountry)
+  // Total funding per country + YoY trend arrow (only when exactly 1 year selected)
   const fundingByCountry = useMemo(() => {
     if (selectedIsos.length <= 1) return []
-    // keep same country order as burdenByCountry (by total cases)
     const order = burdenByCountry.map(r => r.country)
+    const singleYear = selectedYears.length === 1 ? selectedYears[0] : null
+    const prevYear   = singleYear ? singleYear - 1 : null
+
     return selectedIsos.map(iso => {
       const rows = state.funding.filter(f =>
         f.iso_3_code === iso &&
         (!selectedYears.length || selectedYears.includes(f.year))
       )
-      return {
-        country: isoToName[iso] || iso,
-        totalFunding: rows.reduce((s, f) => s + (f.total_funding_usd || 0), 0),
+      const totalFunding = rows.reduce((s, f) => s + (f.total_funding_usd || 0), 0)
+
+      let trend = null
+      if (prevYear) {
+        const prevRows = state.funding.filter(f => f.iso_3_code === iso && f.year === prevYear)
+        if (prevRows.length) {
+          const prev = prevRows.reduce((s, f) => s + (f.total_funding_usd || 0), 0)
+          trend = totalFunding > prev ? 'up' : totalFunding < prev ? 'down' : 'flat'
+        }
       }
+
+      return { country: isoToName[iso] || iso, totalFunding, trend }
     }).sort((a, b) => order.indexOf(a.country) - order.indexOf(b.country))
   }, [state.funding, selectedIsos, selectedYears, isoToName, burdenByCountry])
 
@@ -260,41 +270,77 @@ export default function CountryOverview() {
           )}
 
           {/* Funding by Country — companion to Disease Burden, same country order */}
-          {selectedIsos.length > 1 && fundingByCountry.length > 0 && (
-            <div className="section">
-              <div className="card">
-                <div className="card-header">
-                  <h2 className="card-title">Total Health Funding by Country — {yLabel}</h2>
-                  <button className="btn-link" onClick={() => navigate('/country/funding')}>View detail →</button>
+          {selectedIsos.length > 1 && fundingByCountry.length > 0 && (() => {
+            const singleYear  = selectedYears.length === 1 ? selectedYears[0] : null
+            const prevYear    = singleYear ? singleYear - 1 : null
+            const hasTrends   = fundingByCountry.some(r => r.trend && r.trend !== 'flat')
+            const compSubtitle = prevYear ? `vs ${prevYear}` : null
+
+            const TrendLabel = ({ x, y, width, height, index }) => {
+              const entry = fundingByCountry[index]
+              if (!entry?.trend || entry.trend === 'flat') return null
+              const isUp = entry.trend === 'up'
+              return (
+                <text
+                  x={x + width + 6}
+                  y={y + height / 2}
+                  dominantBaseline="middle"
+                  fontSize={14}
+                  fontWeight="700"
+                  fill={isUp ? '#059669' : '#C00000'}
+                >
+                  {isUp ? '↑' : '↓'}
+                </text>
+              )
+            }
+
+            return (
+              <div className="section">
+                <div className="card">
+                  <div className="card-header">
+                    <div>
+                      <h2 className="card-title">Total Health Funding by Country — {yLabel}</h2>
+                      {compSubtitle && hasTrends && (
+                        <span className="card-subtitle">Arrows show change {compSubtitle}</span>
+                      )}
+                    </div>
+                    <button className="btn-link" onClick={() => navigate('/country/funding')}>View detail →</button>
+                  </div>
+                  <ResponsiveContainer width="100%" height={Math.max(300, selectedIsos.length * 42) + 8}>
+                    <BarChart
+                      data={fundingByCountry}
+                      layout="vertical"
+                      margin={{ top: 4, right: 48, left: 4, bottom: 4 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
+                      <XAxis
+                        type="number"
+                        tickFormatter={v => v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(0)}M` : `$${(v / 1000).toFixed(0)}k`}
+                        tick={{ fontSize: 11, fill: '#6B7C93' }}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="country"
+                        width={160}
+                        tick={{ fontSize: 11, fill: '#1A2B4A' }}
+                      />
+                      <Tooltip
+                        formatter={v => [`$${(v / 1_000_000).toFixed(2)}M`, 'Total Funding']}
+                        contentStyle={{ fontSize: 12 }}
+                      />
+                      <Bar
+                        dataKey="totalFunding"
+                        name="Total Funding"
+                        fill="#059669"
+                        radius={[0, 4, 4, 0]}
+                        label={{ content: TrendLabel }}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-                <ResponsiveContainer width="100%" height={Math.max(300, selectedIsos.length * 42) + 8}>
-                  <BarChart
-                    data={fundingByCountry}
-                    layout="vertical"
-                    margin={{ top: 4, right: 32, left: 4, bottom: 4 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
-                    <XAxis
-                      type="number"
-                      tickFormatter={v => v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(0)}M` : `$${(v / 1000).toFixed(0)}k`}
-                      tick={{ fontSize: 11, fill: '#6B7C93' }}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="country"
-                      width={160}
-                      tick={{ fontSize: 11, fill: '#1A2B4A' }}
-                    />
-                    <Tooltip
-                      formatter={v => [`$${(v / 1_000_000).toFixed(2)}M`, 'Total Funding']}
-                      contentStyle={{ fontSize: 12 }}
-                    />
-                    <Bar dataKey="totalFunding" name="Total Funding" fill="#059669" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           <div className="section">
             <h2 className="section-heading">Explore Sections</h2>
