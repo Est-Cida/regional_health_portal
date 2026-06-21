@@ -25,19 +25,17 @@ export default function LoginPage() {
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-    setTimeout(() => {
-      const result = login(username.trim(), password)
-      setLoading(false)
-      if (result.success) {
-        navigate(REDIRECT[result.user.role] || '/country')
-      } else {
-        setError(result.error)
-      }
-    }, 300)
+    const result = await login(username.trim(), password)
+    setLoading(false)
+    if (result.success) {
+      navigate(REDIRECT[result.user.role] || '/country')
+    } else {
+      setError(result.error)
+    }
   }
 
   const fillHint = (hint) => {
@@ -52,13 +50,7 @@ export default function LoginPage() {
       <div className="login-hero">
         <div className="login-hero-content">
           <div className="login-globe">
-            <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-              <circle cx="40" cy="40" r="38" fill="white" fillOpacity="0.15" stroke="white" strokeWidth="2"/>
-              <circle cx="40" cy="40" r="28" stroke="white" strokeWidth="1.5" fill="none"/>
-              <line x1="4" y1="40" x2="76" y2="40" stroke="white" strokeWidth="1.5"/>
-              <line x1="40" y1="4" x2="40" y2="76" stroke="white" strokeWidth="1.5"/>
-              <ellipse cx="40" cy="40" rx="14" ry="38" stroke="white" strokeWidth="1.5" fill="none"/>
-            </svg>
+            {/* <img src="/WHO AFRO.png" alt="WHO Logo" /> */}
           </div>
           <h1 className="login-hero-title">WHO AFRO</h1>
           <h2 className="login-hero-subtitle">Regional Health<br />Surveillance Portal</h2>

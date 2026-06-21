@@ -18,7 +18,33 @@ function cfr(deaths, cases) {
   return `${((deaths / cases) * 100).toFixed(1)}%`
 }
 
-export default function OutbreakTable({ data = [] }) {
+function EditBtn({ onClick }) {
+  return (
+    <button className="btn-action btn-action-edit" onClick={onClick} title="Edit record">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+    </button>
+  )
+}
+
+function DeleteBtn({ onClick }) {
+  return (
+    <button className="btn-action btn-action-delete" onClick={onClick} title="Delete record">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+      </svg>
+    </button>
+  )
+}
+
+export default function OutbreakTable({ data = [], onEdit, onDelete }) {
+  const hasActions = Boolean(onEdit || onDelete)
+
   if (!data.length) {
     return (
       <div className="table-empty">
@@ -40,6 +66,7 @@ export default function OutbreakTable({ data = [] }) {
             <th>Cases</th>
             <th>Deaths</th>
             <th>CFR</th>
+            {hasActions && <th className="actions-col">Actions</th>}
           </tr>
         </thead>
         <tbody>
@@ -63,6 +90,12 @@ export default function OutbreakTable({ data = [] }) {
                 <td className={`num ${parseFloat(cfr(o.deaths, o.cases)) > 5 ? 'text-danger' : ''}`}>
                   {cfr(o.deaths, o.cases)}
                 </td>
+                {hasActions && (
+                  <td className="actions-col">
+                    {onEdit   && <EditBtn   onClick={() => onEdit(o)}   />}
+                    {onDelete && <DeleteBtn onClick={() => onDelete(o)} />}
+                  </td>
+                )}
               </tr>
             )
           })}
