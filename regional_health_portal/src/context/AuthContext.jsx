@@ -23,17 +23,17 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false))
   }, [])
 
-  const login = useCallback(async (username, password) => {
+  const login = useCallback(async (email, password) => {
     try {
       const res = await fetch(`${API}/api/auth/login`, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body:    new URLSearchParams({ username, password }),
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email: email.trim().toLowerCase(), password }),
       })
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        return { success: false, error: err.detail || 'Invalid username or password' }
+        return { success: false, error: err.detail || 'Invalid email or password' }
       }
 
       const data    = await res.json()

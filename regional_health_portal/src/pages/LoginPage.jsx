@@ -15,7 +15,7 @@ function validateEmail(email) {
   const match = email.trim().match(/^[^\s@]+@([^\s@]+)$/)
   if (!match) return 'Enter a valid email address'
   if (!ALLOWED_DOMAINS.includes(match[1].toLowerCase())) {
-    return `Only @gmail.com, @yahoo.com or @who.int addresses are accepted`
+    return 'Only @gmail.com, @yahoo.com or @who.int addresses are accepted'
   }
   return null
 }
@@ -24,7 +24,6 @@ export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  const [username,   setUsername]   = useState('')
   const [email,      setEmail]      = useState('')
   const [password,   setPassword]   = useState('')
   const [emailError, setEmailError] = useState('')
@@ -46,7 +45,7 @@ export default function LoginPage() {
     }
 
     setLoading(true)
-    const result = await login(username.trim(), password)
+    const result = await login(email, password)
     setLoading(false)
     if (result.success) {
       navigate(REDIRECT[result.user.role] || '/country')
@@ -107,19 +106,6 @@ export default function LoginPage() {
 
           <form className="login-form" onSubmit={handleSubmit}>
             <div className="form-field">
-              <label htmlFor="username">Username</label>
-              <input
-                id="username"
-                type="text"
-                autoComplete="username"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                placeholder="e.g. nga_admin"
-                required
-              />
-            </div>
-
-            <div className="form-field">
               <label htmlFor="email">Email address</label>
               <input
                 id="email"
@@ -128,7 +114,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={e => { setEmail(e.target.value); if (emailError) setEmailError('') }}
                 onBlur={handleEmailBlur}
-                placeholder="you@gmail.com"
+                placeholder="you@who.int"
                 required
                 className={emailError ? 'input-error' : ''}
               />
