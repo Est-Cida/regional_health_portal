@@ -23,17 +23,24 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false))
   }, [])
 
-  const login = useCallback(async (username, password) => {
+  const login = useCallback(async (email, password) => {
     try {
       const res = await fetch(`${API}/api/auth/login`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body:    new URLSearchParams({ username, password }),
+        body:    new URLSearchParams({ username: email.trim().toLowerCase(), password }),
       })
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        return { success: false, error: err.detail || 'Invalid username or password' }
+        // FastAPI 422 returns detail as an array of Pydantic error objects — normalise to string
+        const detail = err.detail
+        const msg = typeof detail === 'string'
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map(d => d.msg).join(', ')
+            : 'Invalid email or password'
+        return { success: false, error: msg }
       }
 
       const data    = await res.json()

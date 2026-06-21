@@ -2,13 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const DEMO_HINTS = [
-  { label: 'Country Admin (Nigeria)',      username: 'nga_admin',     desc: 'See only Nigeria data' },
-  { label: 'Country Admin (Kenya)',        username: 'ken_admin',     desc: 'See only Kenya data' },
-  { label: 'Regional Admin (West Africa)',  username: 'west_admin',    desc: 'See 7 West African countries' },
-  { label: 'Regional Admin (East Africa)', username: 'east_admin',    desc: 'See 5 East African countries' },
-  { label: 'Super Admin',                  username: 'super_admin',   desc: 'Full access to all 20 countries' },
-]
+const ALLOWED_DOMAINS = ['gmail.com', 'yahoo.com', 'who.int']
 
 const REDIRECT = {
   country_admin:  '/country',
@@ -16,32 +10,48 @@ const REDIRECT = {
   super_admin:    '/admin',
 }
 
+function validateEmail(email) {
+  if (!email) return 'Email is required'
+  const match = email.trim().match(/^[^\s@]+@([^\s@]+)$/)
+  if (!match) return 'Enter a valid email address'
+  if (!ALLOWED_DOMAINS.includes(match[1].toLowerCase())) {
+    return 'Only @gmail.com, @yahoo.com or @who.int addresses are accepted'
+  }
+  return null
+}
+
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
+  const [email,      setEmail]      = useState('')
+  const [password,   setPassword]   = useState('')
+  const [emailError, setEmailError] = useState('')
+  const [error,      setError]      = useState('')
+  const [loading,    setLoading]    = useState(false)
+
+  const handleEmailBlur = () => {
+    setEmailError(validateEmail(email) || '')
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+
+    const emailErr = validateEmail(email)
+    if (emailErr) {
+      setEmailError(emailErr)
+      return
+    }
+
     setLoading(true)
-    const result = await login(username.trim(), password)
+    const result = await login(email, password)
     setLoading(false)
     if (result.success) {
       navigate(REDIRECT[result.user.role] || '/country')
     } else {
       setError(result.error)
     }
-  }
-
-  const fillHint = (hint) => {
-    setUsername(hint.username)
-    setPassword('password123')
-    setError('')
   }
 
   return (
@@ -96,16 +106,20 @@ export default function LoginPage() {
 
           <form className="login-form" onSubmit={handleSubmit}>
             <div className="form-field">
-              <label htmlFor="username">Username</label>
+              <label htmlFor="email">Email address</label>
               <input
-                id="username"
-                type="text"
-                autoComplete="username"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                placeholder="e.g. nga_admin"
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={e => { setEmail(e.target.value); if (emailError) setEmailError('') }}
+                onBlur={handleEmailBlur}
+                placeholder="you@who.int"
                 required
+                className={emailError ? 'input-error' : ''}
               />
+              {emailError && <span className="field-error">{emailError}</span>}
+              <span className="field-hint">Accepted: @gmail.com · @yahoo.com · @who.int</span>
             </div>
 
             <div className="form-field">
@@ -125,19 +139,6 @@ export default function LoginPage() {
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
-
-          {/* Demo accounts */}
-          <div className="demo-section">
-            <div className="demo-title">Demo accounts — password: <code>password123</code></div>
-            <div className="demo-hints">
-              {DEMO_HINTS.map(h => (
-                <button key={h.username} className="demo-hint-btn" onClick={() => fillHint(h)}>
-                  <div className="demo-hint-label">{h.label}</div>
-                  <div className="demo-hint-desc">{h.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
 
           <p className="login-footer">
             WHO African Region Office · Brazzaville, Congo
