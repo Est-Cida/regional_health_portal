@@ -44,7 +44,7 @@ function DeleteBtn({ onClick }) {
 }
 
 export default function OutbreaksDashboard() {
-  const { selectedIsos, selectedYears, primaryIso, primaryYear } = useCountry()
+  const { selectedIsos, selectedYears, primaryIso, primaryYear, availableCountries } = useCountry()
   const { state, update, remove, add } = useDataStore()
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
@@ -86,6 +86,22 @@ export default function OutbreaksDashboard() {
     year: y,
     count: allOutbreaks.filter(o => o.year === y).length,
   }))
+
+  const isoToName = useMemo(() => {
+    const map = {}
+    availableCountries.forEach(c => { map[c.iso_3_code] = c.country_name })
+    return map
+  }, [availableCountries])
+
+  const byCountry = useMemo(() => {
+    if (selectedIsos.length <= 1) return []
+    return selectedIsos
+      .map(iso => ({
+        country: isoToName[iso] || iso,
+        count: allOutbreaks.filter(o => o.iso_3_code === iso).length,
+      }))
+      .sort((a, b) => b.count - a.count)
+  }, [allOutbreaks, selectedIsos, isoToName])
 
   function handleSaveEdit(changes) {
     update('outbreaks', rowId('outbreaks', editRecord), changes)
@@ -174,6 +190,37 @@ export default function OutbreaksDashboard() {
           </div>
         </div>
       </section>
+
+      {byCountry.length > 0 && (
+        <section className="section">
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Outbreaks by Country</h2>
+              <span className="card-subtitle">All years combined · highest to lowest</span>
+            </div>
+            <ResponsiveContainer width="100%" height={Math.max(220, byCountry.length * 38) + 8}>
+              <BarChart
+                data={byCountry}
+                layout="vertical"
+                margin={{ top: 4, right: 40, left: 4, bottom: 4 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7C93' }} />
+                <YAxis
+                  type="category"
+                  dataKey="country"
+                  width={160}
+                  tick={{ fontSize: 11, fill: '#1A2B4A' }}
+                />
+                <Tooltip formatter={v => [`${v} outbreaks`]} />
+                <Bar dataKey="count" name="Outbreaks" fill="#D97706" radius={[0, 4, 4, 0]}
+                  label={{ position: 'right', fontSize: 11, fill: '#6B7C93' }}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      )}
 
       <section className="section">
         <div className="card">
