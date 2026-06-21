@@ -208,7 +208,7 @@ export default function CountryOverview() {
                   <BarChart
                     data={burdenByCountry}
                     layout="vertical"
-                    margin={{ top: 48, right: 32, left: 4, bottom: 4 }}
+                    margin={{ top: 4, right: 32, left: 4, bottom: 4 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
                     <XAxis type="number" tickFormatter={fmtNum} tick={{ fontSize: 11, fill: '#6B7C93' }} />
