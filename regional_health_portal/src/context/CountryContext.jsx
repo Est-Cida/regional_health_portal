@@ -13,22 +13,28 @@ export function CountryProvider({ children }) {
     return getCountries()
   }, [user])
 
-  const defaultIso = user.role === 'country_admin'
-    ? user.country_code
-    : (availableCountries[0]?.iso_3_code ?? null)
+  const defaultIsos = user.role === 'country_admin'
+    ? [user.country_code]
+    : availableCountries.slice(0, 1).map(c => c.iso_3_code)
 
-  const [selectedIso, setSelectedIso]   = useState(defaultIso)
-  const [selectedYear, setSelectedYear] = useState(2024)
+  const [selectedIsos,  setSelectedIsos]  = useState(defaultIsos)
+  const [selectedYears, setSelectedYears] = useState([2024])
+
+  // Primary values for CRUD operations and labels
+  const primaryIso  = selectedIsos[0]  ?? null
+  const primaryYear = selectedYears[0] ?? 2025
 
   const country = useMemo(
-    () => (selectedIso ? getCountry(selectedIso) : null),
-    [selectedIso],
+    () => (primaryIso ? getCountry(primaryIso) : null),
+    [primaryIso],
   )
 
   return (
     <CountryContext.Provider value={{
-      selectedIso, setSelectedIso,
-      selectedYear, setSelectedYear,
+      selectedIsos,  setSelectedIsos,
+      selectedYears, setSelectedYears,
+      primaryIso,
+      primaryYear,
       country,
       availableCountries,
     }}>

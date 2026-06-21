@@ -4,9 +4,11 @@ import { useDataStore, rowId } from '../../context/DataStore'
 import { useAuth } from '../../context/AuthContext'
 import EditRecordModal from '../../components/EditRecordModal'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import PageTabs from '../../components/PageTabs'
+import { YEARS } from '../../data/dataService'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, BarChart, Bar,
+  ResponsiveContainer, BarChart, Bar,
 } from 'recharts'
 
 const ChartTooltip = ({ active, payload, label }) => {
@@ -29,19 +31,13 @@ function AccreditationGauge({ value }) {
   const r = 52, cx = 64, cy = 64
   const circ = 2 * Math.PI * r
   const dash = (capped / 100) * circ
-
   return (
     <div className="gauge-wrap">
       <svg width="128" height="128" viewBox="0 0 128 128">
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="#E5EAF0" strokeWidth="12"/>
-        <circle
-          cx={cx} cy={cy} r={r} fill="none"
-          stroke={color} strokeWidth="12"
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${circ}`}
-          transform={`rotate(-90 ${cx} ${cy})`}
-          style={{ transition: 'stroke-dasharray .6s ease' }}
-        />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="12" strokeLinecap="round"
+          strokeDasharray={`${dash} ${circ}`} transform={`rotate(-90 ${cx} ${cy})`}
+          style={{ transition: 'stroke-dasharray .6s ease' }} />
         <text x={cx} y={cy + 6} textAnchor="middle" fill={color} fontSize="20" fontWeight="800">
           {value?.toFixed(1)}%
         </text>
@@ -76,50 +72,81 @@ function DeleteBtn({ onClick }) {
 }
 
 export default function LaboratoryDashboard() {
-  const { selectedIso, selectedYear } = useCountry()
+  const { selectedIsos, selectedYears } = useCountry()
   const { state, update, remove } = useDataStore()
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
 
+  const [view,         setView]         = useState('charts')
   const [editRecord,   setEditRecord]   = useState(null)
   const [deleteRecord, setDeleteRecord] = useState(null)
 
-  const allYears = useMemo(
-    () => state.labCapacity
-      .filter(l => l.iso_3_code === selectedIso)
-      .sort((a, b) => a.year - b.year),
-    [state.labCapacity, selectedIso],
-  )
+  const multiIso = selectedIsos.length > 1
+  const yLabel = !selectedYears.length || selectedYears.length === YEARS.length
+    ? 'All Years' : selectedYears.length === 1 ? String(selectedYears[0]) : `${selectedYears.length} Years`
 
-  const current = useMemo(
-    () => allYears.find(l => l.year === Number(selectedYear)) || null,
-    [allYears, selectedYear],
-  )
+  // Per-year aggregated data for trend charts (summed labs, averaged rates across selected countries)
+  const allYears = useMemo(() => {
+    const filtered = state.labCapacity.filter(r =>
+      !selectedIsos.length || selectedIsos.includes(r.iso_3_code)
+    )
+    const byYear = {}
+    filtered.forEach(r => {
+      if (!byYear[r.year]) byYear[r.year] = { year: r.year, _n: 0, total_public_labs: 0, labs_iso15189_accredited: 0, iso15189_accreditation_pct: 0, avg_turnaround_time_days: 0, diagnostic_tests_per_100k: 0 }
+      const b = byYear[r.year]
+      b._n++
+      b.total_public_labs          += r.total_public_labs          || 0
+      b.labs_iso15189_accredited   += r.labs_iso15189_accredited   || 0
+      b.iso15189_accreditation_pct += r.iso15189_accreditation_pct || 0
+      b.avg_turnaround_time_days   += r.avg_turnaround_time_days   || 0
+      b.diagnostic_tests_per_100k  += r.diagnostic_tests_per_100k  || 0
+    })
+    return Object.values(byYear).map(({ _n, iso15189_accreditation_pct, avg_turnaround_time_days, diagnostic_tests_per_100k, ...r }) => ({
+      ...r,
+      iso15189_accreditation_pct: _n > 0 ? iso15189_accreditation_pct / _n : 0,
+      avg_turnaround_time_days:   _n > 0 ? avg_turnaround_time_days   / _n : 0,
+      diagnostic_tests_per_100k:  _n > 0 ? diagnostic_tests_per_100k  / _n : 0,
+    })).sort((a, b) => a.year - b.year)
+  }, [state.labCapacity, selectedIsos])
 
-  function handleSaveEdit(changes) {
-    update('labCapacity', rowId('labCapacity', editRecord), changes)
-    setEditRecord(null)
-  }
+  // KPI aggregate for selected years
+  const current = useMemo(() => {
+    const rows = allYears.filter(r => !selectedYears.length || selectedYears.includes(r.year))
+    if (!rows.length) return null
+    const n = rows.length
+    return {
+      total_public_labs:          Math.round(rows.reduce((s, r) => s + r.total_public_labs, 0) / n),
+      labs_iso15189_accredited:   Math.round(rows.reduce((s, r) => s + r.labs_iso15189_accredited, 0) / n),
+      iso15189_accreditation_pct: rows.reduce((s, r) => s + r.iso15189_accreditation_pct, 0) / n,
+      avg_turnaround_time_days:   rows.reduce((s, r) => s + r.avg_turnaround_time_days, 0) / n,
+      diagnostic_tests_per_100k:  Math.round(rows.reduce((s, r) => s + r.diagnostic_tests_per_100k, 0) / n),
+    }
+  }, [allYears, selectedYears])
 
-  function handleConfirmDelete() {
-    remove('labCapacity', rowId('labCapacity', deleteRecord))
-    setDeleteRecord(null)
-  }
+  // Raw rows for Data Table tab
+  const tableRows = useMemo(() =>
+    state.labCapacity.filter(r =>
+      (!selectedIsos.length  || selectedIsos.includes(r.iso_3_code)) &&
+      (!selectedYears.length || selectedYears.includes(r.year))
+    ).sort((a, b) => a.year - b.year || a.iso_3_code.localeCompare(b.iso_3_code))
+  , [state.labCapacity, selectedIsos, selectedYears])
 
-  if (!selectedIso) return <div className="page-empty">Select a country above.</div>
+  if (!selectedIsos.length) return <div className="page-empty">Select a country above.</div>
 
   return (
     <>
       <div className="page-header-slim">
         <h1 className="page-title">Laboratory Capacity</h1>
-        <p className="page-desc">Lab infrastructure, accreditation &amp; diagnostic output · {selectedYear}</p>
+        <p className="page-desc">Lab infrastructure, accreditation &amp; diagnostic output · {yLabel}</p>
       </div>
 
-      {/* KPI cards + gauge */}
+      <PageTabs view={view} onChange={setView} />
+
+      {view === 'charts' && <>
+
       <section className="section">
         <div className="lab-overview-grid">
           <AccreditationGauge value={current?.iso15189_accreditation_pct} />
-
           <div className="kpi-grid kpi-grid-4" style={{ flex: 1 }}>
             <div className="kpi-card" style={{ borderTop: '4px solid #0071BC', background: '#EBF5FF' }}>
               <div className="kpi-card-header"><span className="kpi-title">Public Labs</span></div>
@@ -134,8 +161,7 @@ export default function LaboratoryDashboard() {
             <div className="kpi-card" style={{ borderTop: '4px solid #D97706', background: '#FFF8ED' }}>
               <div className="kpi-card-header"><span className="kpi-title">Turnaround</span></div>
               <div className="kpi-value" style={{ color: '#D97706' }}>
-                {current?.avg_turnaround_time_days?.toFixed(1) ?? '—'}
-                <span style={{ fontSize: 14 }}> d</span>
+                {current?.avg_turnaround_time_days?.toFixed(1) ?? '—'}<span style={{ fontSize: 14 }}> d</span>
               </div>
               <div className="kpi-subtitle">avg. result time</div>
             </div>
@@ -148,28 +174,22 @@ export default function LaboratoryDashboard() {
         </div>
       </section>
 
-      {/* Trend charts */}
       <section className="section">
         <div className="charts-grid">
           <div className="card">
-            <div className="card-header">
-              <h2 className="card-title">ISO 15189 Accreditation Rate (%)</h2>
-            </div>
+            <div className="card-header"><h2 className="card-title">ISO 15189 Accreditation Rate (%)</h2></div>
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={allYears} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5EAF0" />
                 <XAxis dataKey="year" tick={{ fontSize: 11, fill: '#6B7C93' }} />
                 <YAxis domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fontSize: 11, fill: '#6B7C93' }} />
-                <Tooltip content={<ChartTooltip />} formatter={v => [`${v?.toFixed(1)}%`]} />
+                <Tooltip content={<ChartTooltip />} />
                 <Line type="monotone" dataKey="iso15189_accreditation_pct" name="Accreditation %" stroke="#059669" strokeWidth={2.5} dot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
-
           <div className="card">
-            <div className="card-header">
-              <h2 className="card-title">Avg. Turnaround Time (days)</h2>
-            </div>
+            <div className="card-header"><h2 className="card-title">Avg. Turnaround Time (days)</h2></div>
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={allYears} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5EAF0" />
@@ -185,9 +205,7 @@ export default function LaboratoryDashboard() {
 
       <section className="section">
         <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Diagnostic Tests per 100k Population</h2>
-          </div>
+          <div className="card-header"><h2 className="card-title">Diagnostic Tests per 100k Population</h2></div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={allYears} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5EAF0" />
@@ -200,64 +218,74 @@ export default function LaboratoryDashboard() {
         </div>
       </section>
 
-      {/* Year-by-year data table */}
-      <section className="section">
-        <div className="card">
-          <div className="card-header"><h2 className="card-title">Laboratory Data by Year</h2></div>
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Year</th>
-                  <th>Public Labs</th>
-                  <th>Accredited Labs</th>
-                  <th>Accreditation %</th>
-                  <th>Avg. Turnaround (days)</th>
-                  <th>Tests / 100k</th>
-                  {canEdit && <th className="actions-col">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {allYears.map(r => (
-                  <tr key={r.year} className={r.year === selectedYear ? 'row-highlighted' : ''}>
-                    <td><strong>{r.year}</strong>{r.year === selectedYear && <span className="year-badge">selected</span>}</td>
-                    <td className="num">{r.total_public_labs}</td>
-                    <td className="num">{r.labs_iso15189_accredited}</td>
-                    <td className={`num ${r.iso15189_accreditation_pct >= 80 ? 'text-success' : r.iso15189_accreditation_pct < 50 ? 'text-danger' : 'text-warn'}`}>
-                      {r.iso15189_accreditation_pct?.toFixed(1)}%
-                    </td>
-                    <td className={`num ${r.avg_turnaround_time_days > 5 ? 'text-warn' : ''}`}>
-                      {r.avg_turnaround_time_days?.toFixed(1)}
-                    </td>
-                    <td className="num">{r.diagnostic_tests_per_100k}</td>
-                    {canEdit && (
-                      <td className="actions-col">
-                        <EditBtn   onClick={() => setEditRecord(r)}   />
-                        <DeleteBtn onClick={() => setDeleteRecord(r)} />
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+      </>}
 
-      {editRecord && (
-        <EditRecordModal
-          record={editRecord}
-          tableType="labCapacity"
-          onSave={handleSaveEdit}
-          onClose={() => setEditRecord(null)}
-        />
+      {view === 'table' && (
+        <section className="section">
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Laboratory Data — All Years</h2>
+              <span className="card-subtitle">{tableRows.length} records</span>
+            </div>
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    {multiIso && <th>Country</th>}
+                    <th>Public Labs</th>
+                    <th>Accredited Labs</th>
+                    <th>Accreditation %</th>
+                    <th>Avg. Turnaround (days)</th>
+                    <th>Tests / 100k</th>
+                    {canEdit && !multiIso && <th className="actions-col">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableRows.length === 0 && (
+                    <tr><td colSpan={7} className="table-empty">No laboratory data found</td></tr>
+                  )}
+                  {tableRows.map(r => (
+                    <tr key={`${r.iso_3_code}-${r.year}`} className={selectedYears.includes(r.year) ? 'row-highlighted' : ''}>
+                      <td>
+                        <strong>{r.year}</strong>
+                        {selectedYears.includes(r.year) && selectedYears.length < YEARS.length && (
+                          <span className="year-badge">selected</span>
+                        )}
+                      </td>
+                      {multiIso && <td className="mono">{r.iso_3_code}</td>}
+                      <td className="num">{r.total_public_labs}</td>
+                      <td className="num">{r.labs_iso15189_accredited}</td>
+                      <td className={`num ${r.iso15189_accreditation_pct >= 80 ? 'text-success' : r.iso15189_accreditation_pct < 50 ? 'text-danger' : 'text-warn'}`}>
+                        {r.iso15189_accreditation_pct?.toFixed(1)}%
+                      </td>
+                      <td className={`num ${r.avg_turnaround_time_days > 5 ? 'text-warn' : ''}`}>
+                        {r.avg_turnaround_time_days?.toFixed(1)}
+                      </td>
+                      <td className="num">{r.diagnostic_tests_per_100k}</td>
+                      {canEdit && !multiIso && (
+                        <td className="actions-col">
+                          <EditBtn   onClick={() => setEditRecord(r)}   />
+                          <DeleteBtn onClick={() => setDeleteRecord(r)} />
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       )}
 
+      {editRecord && (
+        <EditRecordModal record={editRecord} tableType="labCapacity" onSave={changes => { update('labCapacity', rowId('labCapacity', editRecord), changes); setEditRecord(null) }} onClose={() => setEditRecord(null)} />
+      )}
       {deleteRecord && (
         <ConfirmDialog
           title="Delete Laboratory Record"
           message={`Delete laboratory data for ${deleteRecord.year}? This cannot be undone.`}
-          onConfirm={handleConfirmDelete}
+          onConfirm={() => { remove('labCapacity', rowId('labCapacity', deleteRecord)); setDeleteRecord(null) }}
           onCancel={() => setDeleteRecord(null)}
         />
       )}

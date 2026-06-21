@@ -4,6 +4,7 @@ import { DataStoreProvider } from '../../context/DataStore'
 import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/Layout/Sidebar'
 import Navbar from '../../components/Layout/Navbar'
+import MultiSelectDropdown from '../../components/MultiSelectDropdown'
 
 const YEARS = [2021, 2022, 2023, 2024, 2025]
 const PRIORITY_COLOR = { 1: '#C00000', 2: '#D97706', 3: '#059669' }
@@ -12,10 +13,12 @@ const PRIORITY_LABEL = { 1: 'High Priority', 2: 'Medium Priority', 3: 'Standard'
 function CountrySubHeader() {
   const { user } = useAuth()
   const {
-    selectedIso, setSelectedIso,
-    selectedYear, setSelectedYear,
+    selectedIsos, setSelectedIsos,
+    selectedYears, setSelectedYears,
     country, availableCountries,
   } = useCountry()
+
+  const extraCount = selectedIsos.length > 1 ? selectedIsos.length - 1 : 0
 
   return (
     <div className="country-subheader">
@@ -24,7 +27,14 @@ function CountrySubHeader() {
           <>
             <div className="subheader-iso">{country.iso_3_code}</div>
             <div className="subheader-info">
-              <span className="subheader-name">{country.country_name}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="subheader-name">{country.country_name}</span>
+                {extraCount > 0 && (
+                  <span className="subheader-tag" style={{ background: '#E8F0FE', color: '#0071BC', fontWeight: 600 }}>
+                    +{extraCount} more
+                  </span>
+                )}
+              </div>
               <div className="subheader-tags">
                 <span className="subheader-tag">AFRO {country.afro_subregion}</span>
                 <span
@@ -43,27 +53,21 @@ function CountrySubHeader() {
 
       <div className="country-subheader-controls">
         {user.role !== 'country_admin' && (
-          <select
-            className="select-control"
-            value={selectedIso || ''}
-            onChange={e => setSelectedIso(e.target.value)}
-          >
-            {availableCountries.map(c => (
-              <option key={c.iso_3_code} value={c.iso_3_code}>{c.country_name}</option>
-            ))}
-          </select>
+          <MultiSelectDropdown
+            options={availableCountries.map(c => ({ value: c.iso_3_code, label: c.country_name }))}
+            selected={selectedIsos}
+            onChange={setSelectedIsos}
+            placeholder="Select country…"
+            allLabel="All Countries"
+          />
         )}
-        <div className="year-tabs">
-          {YEARS.map(y => (
-            <button
-              key={y}
-              className={`year-tab${selectedYear === y ? ' active' : ''}`}
-              onClick={() => setSelectedYear(y)}
-            >
-              {y}
-            </button>
-          ))}
-        </div>
+        <MultiSelectDropdown
+          options={YEARS.map(y => ({ value: y, label: String(y) }))}
+          selected={selectedYears}
+          onChange={setSelectedYears}
+          placeholder="Select year…"
+          allLabel="All Years"
+        />
       </div>
     </div>
   )

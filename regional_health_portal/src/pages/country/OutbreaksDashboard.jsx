@@ -7,6 +7,7 @@ import OutbreakTable from '../../components/OutbreakTable'
 import EditRecordModal from '../../components/EditRecordModal'
 import AddOutbreakModal from '../../components/AddOutbreakModal'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import PageTabs from '../../components/PageTabs'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
@@ -18,26 +19,52 @@ const DISEASE_COLORS = {
   'Viral haemorrhagic fever': '#8B0000', 'Polio (cVDPV)': '#059669',
 }
 
+function EditBtn({ onClick }) {
+  return (
+    <button className="btn-action btn-action-edit" onClick={onClick} title="Edit record">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+    </button>
+  )
+}
+
+function DeleteBtn({ onClick }) {
+  return (
+    <button className="btn-action btn-action-delete" onClick={onClick} title="Delete record">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+      </svg>
+    </button>
+  )
+}
+
 export default function OutbreaksDashboard() {
-  const { selectedIso, selectedYear } = useCountry()
+  const { selectedIsos, selectedYears, primaryIso, primaryYear } = useCountry()
   const { state, update, remove, add } = useDataStore()
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
 
+  const [view,          setView]          = useState('charts')
   const [filterYear,    setFilterYear]    = useState('all')
   const [filterDisease, setFilterDisease] = useState('all')
   const [editRecord,    setEditRecord]    = useState(null)
   const [deleteRecord,  setDeleteRecord]  = useState(null)
   const [showAdd,       setShowAdd]       = useState(false)
 
-  const diseases = useMemo(() => getDiseaseList(), [])
+  const diseases  = useMemo(() => getDiseaseList(), [])
+  const multiIso  = selectedIsos.length > 1
 
-  const allOutbreaks = useMemo(
-    () => state.outbreaks
-      .filter(o => o.iso_3_code === selectedIso)
+  // All outbreaks for selected countries
+  const allOutbreaks = useMemo(() =>
+    state.outbreaks
+      .filter(o => !selectedIsos.length || selectedIsos.includes(o.iso_3_code))
       .sort((a, b) => new Date(b.start_date) - new Date(a.start_date)),
-    [state.outbreaks, selectedIso],
-  )
+    [state.outbreaks, selectedIsos])
 
   const filtered = useMemo(() => {
     let rows = allOutbreaks
@@ -48,7 +75,7 @@ export default function OutbreaksDashboard() {
 
   const avgDuration  = filtered.length ? (filtered.reduce((s, o) => s + (o.duration_days          || 0), 0) / filtered.length).toFixed(1) : '—'
   const avgDetection = filtered.length ? (filtered.reduce((s, o) => s + (o.time_to_detection_days || 0), 0) / filtered.length).toFixed(1) : '—'
-  const totalCases   = filtered.reduce((s, o) => s + (o.cases  || 0), 0)
+  const totalCases   = filtered.reduce((s, o) => s + (o.cases || 0), 0)
 
   const byDisease = diseases
     .map(d => ({ disease: d, count: allOutbreaks.filter(o => o.disease === d).length }))
@@ -75,7 +102,7 @@ export default function OutbreaksDashboard() {
     setShowAdd(false)
   }
 
-  if (!selectedIso) return <div className="page-empty">Select a country above.</div>
+  if (!selectedIsos.length) return <div className="page-empty">Select a country above.</div>
 
   return (
     <>
@@ -83,6 +110,10 @@ export default function OutbreaksDashboard() {
         <h1 className="page-title">Outbreaks</h1>
         <p className="page-desc">Outbreak events across all years</p>
       </div>
+
+      <PageTabs view={view} onChange={setView} />
+
+      {view === 'charts' && <>
 
       <section className="section">
         <div className="kpi-grid kpi-grid-4">
@@ -123,18 +154,14 @@ export default function OutbreaksDashboard() {
                 <YAxis type="category" dataKey="disease" tick={{ fontSize: 11, fill: '#1A2B4A' }} width={135} />
                 <Tooltip formatter={v => [`${v} outbreaks`]} />
                 <Bar dataKey="count" name="Outbreaks" radius={[0, 4, 4, 0]}>
-                  {byDisease.map(d => (
-                    <Cell key={d.disease} fill={DISEASE_COLORS[d.disease] || '#6B7C93'} />
-                  ))}
+                  {byDisease.map(d => <Cell key={d.disease} fill={DISEASE_COLORS[d.disease] || '#6B7C93'} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           <div className="card">
-            <div className="card-header">
-              <h2 className="card-title">Outbreaks per Year</h2>
-            </div>
+            <div className="card-header"><h2 className="card-title">Outbreaks per Year</h2></div>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={byYear} margin={{ top: 4, right: 20, left: 8, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5EAF0" />
@@ -177,15 +204,82 @@ export default function OutbreaksDashboard() {
         </div>
       </section>
 
-      {editRecord && (
-        <EditRecordModal
-          record={editRecord}
-          tableType="outbreaks"
-          onSave={handleSaveEdit}
-          onClose={() => setEditRecord(null)}
-        />
+      </>}
+
+      {view === 'table' && (
+        <section className="section">
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Outbreak Records — All Years</h2>
+              <div className="card-filters">
+                <span className="card-subtitle">{allOutbreaks.length} outbreaks</span>
+                {canEdit && (
+                  <button className="btn-add-record" onClick={() => setShowAdd(true)}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add Outbreak
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    {multiIso && <th>Country</th>}
+                    <th>Disease</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Cases</th>
+                    <th>Deaths</th>
+                    <th>Duration (days)</th>
+                    <th>Detection (days)</th>
+                    {canEdit && !multiIso && <th className="actions-col">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {allOutbreaks.length === 0 && (
+                    <tr><td colSpan={9} className="table-empty">No outbreak records found</td></tr>
+                  )}
+                  {allOutbreaks.map(o => (
+                    <tr key={o.outbreak_id} className={selectedYears.includes(o.year) ? 'row-highlighted' : ''}>
+                      <td>
+                        <strong>{o.year}</strong>
+                        {selectedYears.includes(o.year) && selectedYears.length < YEARS.length && (
+                          <span className="year-badge">selected</span>
+                        )}
+                      </td>
+                      {multiIso && <td className="mono">{o.iso_3_code}</td>}
+                      <td>
+                        <span className="disease-dot" style={{ background: DISEASE_COLORS[o.disease] || '#6B7C93' }} />
+                        {o.disease}
+                      </td>
+                      <td>{o.start_date}</td>
+                      <td>{o.end_date || '—'}</td>
+                      <td className="num">{o.cases?.toLocaleString() ?? '—'}</td>
+                      <td className="num">{o.deaths?.toLocaleString() ?? '—'}</td>
+                      <td className="num">{o.duration_days ?? '—'}</td>
+                      <td className={`num ${o.time_to_detection_days > 7 ? 'text-warn' : ''}`}>
+                        {o.time_to_detection_days ?? '—'}
+                      </td>
+                      {canEdit && !multiIso && (
+                        <td className="actions-col">
+                          <EditBtn   onClick={() => setEditRecord(o)}   />
+                          <DeleteBtn onClick={() => setDeleteRecord(o)} />
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       )}
 
+      {editRecord && (
+        <EditRecordModal record={editRecord} tableType="outbreaks" onSave={handleSaveEdit} onClose={() => setEditRecord(null)} />
+      )}
       {deleteRecord && (
         <ConfirmDialog
           title="Delete Outbreak"
@@ -194,11 +288,10 @@ export default function OutbreaksDashboard() {
           onCancel={() => setDeleteRecord(null)}
         />
       )}
-
       {showAdd && (
         <AddOutbreakModal
-          iso3={selectedIso}
-          year={selectedYear}
+          iso3={primaryIso}
+          year={typeof primaryYear === 'number' ? primaryYear : 2025}
           existingOutbreaks={state.outbreaks}
           onSave={handleAddOutbreak}
           onClose={() => setShowAdd(false)}

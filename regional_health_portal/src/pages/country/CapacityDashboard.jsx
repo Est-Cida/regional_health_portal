@@ -4,6 +4,8 @@ import { useDataStore, rowId } from '../../context/DataStore'
 import { useAuth } from '../../context/AuthContext'
 import EditRecordModal from '../../components/EditRecordModal'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import PageTabs from '../../components/PageTabs'
+import { YEARS } from '../../data/dataService'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, BarChart, Bar,
@@ -63,48 +65,102 @@ function DeleteBtn({ onClick }) {
   )
 }
 
+// Aggregate rows by year, summing counts and averaging rates
+function aggregateByYear(rows, sumFields, avgFields) {
+  const byYear = {}
+  rows.forEach(r => {
+    if (!byYear[r.year]) byYear[r.year] = { year: r.year, _n: 0, ...Object.fromEntries([...sumFields, ...avgFields].map(f => [f, 0])) }
+    byYear[r.year]._n++
+    sumFields.forEach(f => { byYear[r.year][f] += r[f] || 0 })
+    avgFields.forEach(f => { byYear[r.year][f] += r[f] || 0 })
+  })
+  return Object.values(byYear).map(({ _n, ...r }) => {
+    avgFields.forEach(f => { r[f] = _n > 0 ? r[f] / _n : 0 })
+    return r
+  }).sort((a, b) => a.year - b.year)
+}
+
 export default function CapacityDashboard() {
-  const { selectedIso, selectedYear } = useCountry()
+  const { selectedIsos, selectedYears } = useCountry()
   const { state, update, remove } = useDataStore()
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
 
-  const [editWF,   setEditWF]   = useState(null)
-  const [deleteWF, setDeleteWF] = useState(null)
-  const [editRep,  setEditRep]  = useState(null)
+  const [view,      setView]      = useState('charts')
+  const [editWF,    setEditWF]    = useState(null)
+  const [deleteWF,  setDeleteWF]  = useState(null)
+  const [editRep,   setEditRep]   = useState(null)
   const [deleteRep, setDeleteRep] = useState(null)
 
-  const workforceAll = useMemo(
-    () => state.workforce.filter(w => w.iso_3_code === selectedIso).sort((a, b) => a.year - b.year),
-    [state.workforce, selectedIso],
-  )
-  const reportingAll = useMemo(
-    () => state.reporting.filter(r => r.iso_3_code === selectedIso).sort((a, b) => a.year - b.year),
-    [state.reporting, selectedIso],
-  )
+  const multiIso = selectedIsos.length > 1
+  const yLabel = !selectedYears.length || selectedYears.length === YEARS.length
+    ? 'All Years' : selectedYears.length === 1 ? String(selectedYears[0]) : `${selectedYears.length} Years`
 
-  const workforce = useMemo(
-    () => workforceAll.find(w => w.year === Number(selectedYear)) || null,
-    [workforceAll, selectedYear],
-  )
-  const reporting = useMemo(
-    () => reportingAll.find(r => r.year === Number(selectedYear)) || null,
-    [reportingAll, selectedYear],
-  )
+  // Per-year aggregated workforce (for charts)
+  const workforceAll = useMemo(() => {
+    const rows = state.workforce.filter(r => !selectedIsos.length || selectedIsos.includes(r.iso_3_code))
+    return aggregateByYear(rows,
+      ['epidemiologists_total', 'feltp_trained_total', 'lab_technicians_total'],
+      ['epidemiologists_per_100k', 'feltp_trained_pct', 'lab_technicians_per_100k']
+    )
+  }, [state.workforce, selectedIsos])
 
-  if (!selectedIso) return <div className="page-empty">Select a country above.</div>
+  // Per-year aggregated reporting (for charts)
+  const reportingAll = useMemo(() => {
+    const rows = state.reporting.filter(r => !selectedIsos.length || selectedIsos.includes(r.iso_3_code))
+    return aggregateByYear(rows, [], ['timeliness_pct', 'completeness_pct', 'idsr_weekly_compliance_pct'])
+  }, [state.reporting, selectedIsos])
+
+  // KPI aggregate for selected years
+  const workforce = useMemo(() => {
+    const rows = workforceAll.filter(r => !selectedYears.length || selectedYears.includes(r.year))
+    if (!rows.length) return null
+    const n = rows.length
+    return {
+      epidemiologists_total:    Math.round(rows.reduce((s, r) => s + r.epidemiologists_total,    0) / n),
+      epidemiologists_per_100k: rows.reduce((s, r) => s + r.epidemiologists_per_100k, 0) / n,
+      feltp_trained_total:      Math.round(rows.reduce((s, r) => s + r.feltp_trained_total,      0) / n),
+      feltp_trained_pct:        rows.reduce((s, r) => s + r.feltp_trained_pct,        0) / n,
+      lab_technicians_total:    Math.round(rows.reduce((s, r) => s + r.lab_technicians_total,    0) / n),
+      lab_technicians_per_100k: rows.reduce((s, r) => s + r.lab_technicians_per_100k, 0) / n,
+    }
+  }, [workforceAll, selectedYears])
+
+  const reporting = useMemo(() => {
+    const rows = reportingAll.filter(r => !selectedYears.length || selectedYears.includes(r.year))
+    if (!rows.length) return null
+    const n = rows.length
+    return {
+      timeliness_pct:             rows.reduce((s, r) => s + r.timeliness_pct,             0) / n,
+      completeness_pct:           rows.reduce((s, r) => s + r.completeness_pct,           0) / n,
+      idsr_weekly_compliance_pct: rows.reduce((s, r) => s + r.idsr_weekly_compliance_pct, 0) / n,
+    }
+  }, [reportingAll, selectedYears])
+
+  // Raw rows for Data Table tab
+  const wfTableRows  = useMemo(() =>
+    state.workforce.filter(r => (!selectedIsos.length || selectedIsos.includes(r.iso_3_code)) && (!selectedYears.length || selectedYears.includes(r.year))).sort((a, b) => a.year - b.year)
+  , [state.workforce, selectedIsos, selectedYears])
+
+  const repTableRows = useMemo(() =>
+    state.reporting.filter(r => (!selectedIsos.length || selectedIsos.includes(r.iso_3_code)) && (!selectedYears.length || selectedYears.includes(r.year))).sort((a, b) => a.year - b.year)
+  , [state.reporting, selectedIsos, selectedYears])
+
+  if (!selectedIsos.length) return <div className="page-empty">Select a country above.</div>
 
   return (
     <>
       <div className="page-header-slim">
         <h1 className="page-title">Health Capacity</h1>
-        <p className="page-desc">Workforce &amp; surveillance reporting · {selectedYear}</p>
+        <p className="page-desc">Workforce &amp; surveillance reporting · {yLabel}</p>
       </div>
 
-      {/* ── Workforce ──────────────────────────────────────────────── */}
+      <PageTabs view={view} onChange={setView} />
+
+      {view === 'charts' && <>
+
       <section className="section">
         <h2 className="section-heading">Health Workforce</h2>
-
         <div className="kpi-grid kpi-grid-3 section">
           <div className="kpi-card" style={{ borderTop: '4px solid #0071BC', background: '#EBF5FF' }}>
             <div className="kpi-card-header"><span className="kpi-title">Epidemiologists</span></div>
@@ -122,12 +178,9 @@ export default function CapacityDashboard() {
             <div className="kpi-subtitle">{workforce?.lab_technicians_per_100k?.toFixed(2) ?? '—'} per 100k pop</div>
           </div>
         </div>
-
         <div className="charts-grid">
           <div className="card">
-            <div className="card-header">
-              <h2 className="card-title">Epidemiologist Count — 2021–2025</h2>
-            </div>
+            <div className="card-header"><h2 className="card-title">Epidemiologist Count — 2021–2025</h2></div>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={workforceAll} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5EAF0" />
@@ -140,11 +193,8 @@ export default function CapacityDashboard() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-
           <div className="card">
-            <div className="card-header">
-              <h2 className="card-title">FELTP Training Rate (%)</h2>
-            </div>
+            <div className="card-header"><h2 className="card-title">FELTP Training Rate (%)</h2></div>
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={workforceAll} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5EAF0" />
@@ -156,68 +206,19 @@ export default function CapacityDashboard() {
             </ResponsiveContainer>
           </div>
         </div>
-
-        {/* Workforce data table */}
-        <div className="card">
-          <div className="card-header"><h2 className="card-title">Workforce Data by Year</h2></div>
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Year</th>
-                  <th>Epidemiologists</th>
-                  <th>Epi / 100k</th>
-                  <th>FELTP Trained</th>
-                  <th>FELTP %</th>
-                  <th>Lab Technicians</th>
-                  <th>Lab Tech / 100k</th>
-                  {canEdit && <th className="actions-col">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {workforceAll.map(r => (
-                  <tr key={r.year} className={r.year === selectedYear ? 'row-highlighted' : ''}>
-                    <td><strong>{r.year}</strong>{r.year === selectedYear && <span className="year-badge">selected</span>}</td>
-                    <td className="num">{r.epidemiologists_total}</td>
-                    <td className="num">{r.epidemiologists_per_100k?.toFixed(3)}</td>
-                    <td className="num">{r.feltp_trained_total}</td>
-                    <td className={`num ${r.feltp_trained_pct >= 50 ? 'text-success' : 'text-warn'}`}>
-                      {r.feltp_trained_pct?.toFixed(1)}%
-                    </td>
-                    <td className="num">{r.lab_technicians_total}</td>
-                    <td className="num">{r.lab_technicians_per_100k?.toFixed(2)}</td>
-                    {canEdit && (
-                      <td className="actions-col">
-                        <EditBtn   onClick={() => setEditWF(r)}   />
-                        <DeleteBtn onClick={() => setDeleteWF(r)} />
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </section>
 
-      {/* ── Reporting Metrics ──────────────────────────────────────── */}
       <section className="section">
-        <h2 className="section-heading">Surveillance Reporting — {selectedYear}</h2>
-
+        <h2 className="section-heading">Surveillance Reporting — {yLabel}</h2>
         {reporting ? (
           <div className="capacity-card" style={{ marginBottom: 16 }}>
             <MetricProgress label="Timeliness"             value={reporting.timeliness_pct} />
             <MetricProgress label="Completeness"           value={reporting.completeness_pct} />
             <MetricProgress label="IDSR Weekly Compliance" value={reporting.idsr_weekly_compliance_pct} />
           </div>
-        ) : (
-          <p className="no-data">No reporting data for {selectedYear}</p>
-        )}
-
+        ) : <p className="no-data">No reporting data for selected filters</p>}
         <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Reporting Metrics Trend — 2021–2025</h2>
-          </div>
+          <div className="card-header"><h2 className="card-title">Reporting Metrics Trend — 2021–2025</h2></div>
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={reportingAll} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#E5EAF0" />
@@ -225,89 +226,98 @@ export default function CapacityDashboard() {
               <YAxis tickFormatter={v => `${v}%`} domain={[0, 100]} tick={{ fontSize: 11, fill: '#6B7C93' }} />
               <Tooltip content={<ChartTooltip />} formatter={v => [`${v?.toFixed(1)}%`]} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line type="monotone" dataKey="timeliness_pct"              name="Timeliness"      stroke="#0071BC" strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="completeness_pct"            name="Completeness"    stroke="#059669" strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="idsr_weekly_compliance_pct"  name="IDSR Compliance" stroke="#D97706" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="timeliness_pct"             name="Timeliness"      stroke="#0071BC" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="completeness_pct"           name="Completeness"    stroke="#059669" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="idsr_weekly_compliance_pct" name="IDSR Compliance" stroke="#D97706" strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
-
-        {/* Reporting data table */}
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="card-header"><h2 className="card-title">Reporting Data by Year</h2></div>
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Year</th>
-                  <th>Timeliness %</th>
-                  <th>Completeness %</th>
-                  <th>IDSR Compliance %</th>
-                  {canEdit && <th className="actions-col">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {reportingAll.map(r => (
-                  <tr key={r.year} className={r.year === selectedYear ? 'row-highlighted' : ''}>
-                    <td><strong>{r.year}</strong>{r.year === selectedYear && <span className="year-badge">selected</span>}</td>
-                    <td className={`num ${r.timeliness_pct >= 80 ? 'text-success' : r.timeliness_pct < 50 ? 'text-danger' : 'text-warn'}`}>
-                      {r.timeliness_pct?.toFixed(1)}%
-                    </td>
-                    <td className={`num ${r.completeness_pct >= 80 ? 'text-success' : r.completeness_pct < 50 ? 'text-danger' : 'text-warn'}`}>
-                      {r.completeness_pct?.toFixed(1)}%
-                    </td>
-                    <td className={`num ${r.idsr_weekly_compliance_pct >= 80 ? 'text-success' : r.idsr_weekly_compliance_pct < 50 ? 'text-danger' : 'text-warn'}`}>
-                      {r.idsr_weekly_compliance_pct?.toFixed(1)}%
-                    </td>
-                    {canEdit && (
-                      <td className="actions-col">
-                        <EditBtn   onClick={() => setEditRep(r)}   />
-                        <DeleteBtn onClick={() => setDeleteRep(r)} />
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </section>
 
-      {/* Workforce modals */}
-      {editWF && (
-        <EditRecordModal
-          record={editWF}
-          tableType="workforce"
-          onSave={changes => { update('workforce', rowId('workforce', editWF), changes); setEditWF(null) }}
-          onClose={() => setEditWF(null)}
-        />
-      )}
-      {deleteWF && (
-        <ConfirmDialog
-          title="Delete Workforce Record"
-          message={`Delete workforce data for ${deleteWF.year}? This cannot be undone.`}
-          onConfirm={() => { remove('workforce', rowId('workforce', deleteWF)); setDeleteWF(null) }}
-          onCancel={() => setDeleteWF(null)}
-        />
+      </>}
+
+      {view === 'table' && (
+        <section className="section">
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div className="card-header">
+              <h2 className="card-title">Workforce Data — All Years</h2>
+              <span className="card-subtitle">{wfTableRows.length} records</span>
+            </div>
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    {multiIso && <th>Country</th>}
+                    <th>Epidemiologists</th>
+                    <th>Epi / 100k</th>
+                    <th>FELTP Trained</th>
+                    <th>FELTP %</th>
+                    <th>Lab Technicians</th>
+                    <th>Lab Tech / 100k</th>
+                    {canEdit && !multiIso && <th className="actions-col">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {wfTableRows.length === 0 && <tr><td colSpan={8} className="table-empty">No workforce data found</td></tr>}
+                  {wfTableRows.map(r => (
+                    <tr key={`${r.iso_3_code}-${r.year}`} className={selectedYears.includes(r.year) ? 'row-highlighted' : ''}>
+                      <td><strong>{r.year}</strong>{selectedYears.includes(r.year) && selectedYears.length < YEARS.length && <span className="year-badge">selected</span>}</td>
+                      {multiIso && <td className="mono">{r.iso_3_code}</td>}
+                      <td className="num">{r.epidemiologists_total}</td>
+                      <td className="num">{r.epidemiologists_per_100k?.toFixed(3)}</td>
+                      <td className="num">{r.feltp_trained_total}</td>
+                      <td className={`num ${r.feltp_trained_pct >= 50 ? 'text-success' : 'text-warn'}`}>{r.feltp_trained_pct?.toFixed(1)}%</td>
+                      <td className="num">{r.lab_technicians_total}</td>
+                      <td className="num">{r.lab_technicians_per_100k?.toFixed(2)}</td>
+                      {canEdit && !multiIso && <td className="actions-col"><EditBtn onClick={() => setEditWF(r)} /><DeleteBtn onClick={() => setDeleteWF(r)} /></td>}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Reporting Data — All Years</h2>
+              <span className="card-subtitle">{repTableRows.length} records</span>
+            </div>
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    {multiIso && <th>Country</th>}
+                    <th>Timeliness %</th>
+                    <th>Completeness %</th>
+                    <th>IDSR Compliance %</th>
+                    {canEdit && !multiIso && <th className="actions-col">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {repTableRows.length === 0 && <tr><td colSpan={5} className="table-empty">No reporting data found</td></tr>}
+                  {repTableRows.map(r => (
+                    <tr key={`${r.iso_3_code}-${r.year}`} className={selectedYears.includes(r.year) ? 'row-highlighted' : ''}>
+                      <td><strong>{r.year}</strong>{selectedYears.includes(r.year) && selectedYears.length < YEARS.length && <span className="year-badge">selected</span>}</td>
+                      {multiIso && <td className="mono">{r.iso_3_code}</td>}
+                      <td className={`num ${r.timeliness_pct >= 80 ? 'text-success' : r.timeliness_pct < 50 ? 'text-danger' : 'text-warn'}`}>{r.timeliness_pct?.toFixed(1)}%</td>
+                      <td className={`num ${r.completeness_pct >= 80 ? 'text-success' : r.completeness_pct < 50 ? 'text-danger' : 'text-warn'}`}>{r.completeness_pct?.toFixed(1)}%</td>
+                      <td className={`num ${r.idsr_weekly_compliance_pct >= 80 ? 'text-success' : r.idsr_weekly_compliance_pct < 50 ? 'text-danger' : 'text-warn'}`}>{r.idsr_weekly_compliance_pct?.toFixed(1)}%</td>
+                      {canEdit && !multiIso && <td className="actions-col"><EditBtn onClick={() => setEditRep(r)} /><DeleteBtn onClick={() => setDeleteRep(r)} /></td>}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       )}
 
-      {/* Reporting modals */}
-      {editRep && (
-        <EditRecordModal
-          record={editRep}
-          tableType="reporting"
-          onSave={changes => { update('reporting', rowId('reporting', editRep), changes); setEditRep(null) }}
-          onClose={() => setEditRep(null)}
-        />
-      )}
-      {deleteRep && (
-        <ConfirmDialog
-          title="Delete Reporting Record"
-          message={`Delete reporting metrics for ${deleteRep.year}? This cannot be undone.`}
-          onConfirm={() => { remove('reporting', rowId('reporting', deleteRep)); setDeleteRep(null) }}
-          onCancel={() => setDeleteRep(null)}
-        />
-      )}
+      {editWF && <EditRecordModal record={editWF} tableType="workforce" onSave={changes => { update('workforce', rowId('workforce', editWF), changes); setEditWF(null) }} onClose={() => setEditWF(null)} />}
+      {deleteWF && <ConfirmDialog title="Delete Workforce Record" message={`Delete workforce data for ${deleteWF.year}? This cannot be undone.`} onConfirm={() => { remove('workforce', rowId('workforce', deleteWF)); setDeleteWF(null) }} onCancel={() => setDeleteWF(null)} />}
+      {editRep && <EditRecordModal record={editRep} tableType="reporting" onSave={changes => { update('reporting', rowId('reporting', editRep), changes); setEditRep(null) }} onClose={() => setEditRep(null)} />}
+      {deleteRep && <ConfirmDialog title="Delete Reporting Record" message={`Delete reporting metrics for ${deleteRep.year}? This cannot be undone.`} onConfirm={() => { remove('reporting', rowId('reporting', deleteRep)); setDeleteRep(null) }} onCancel={() => setDeleteRep(null)} />}
     </>
   )
 }

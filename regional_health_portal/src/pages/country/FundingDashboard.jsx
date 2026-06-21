@@ -4,6 +4,8 @@ import { useDataStore, rowId } from '../../context/DataStore'
 import { useAuth } from '../../context/AuthContext'
 import EditRecordModal from '../../components/EditRecordModal'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import PageTabs from '../../components/PageTabs'
+import { YEARS } from '../../data/dataService'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, Cell,
@@ -50,25 +52,63 @@ function DeleteBtn({ onClick }) {
 }
 
 export default function FundingDashboard() {
-  const { selectedIso, selectedYear } = useCountry()
+  const { selectedIsos, selectedYears } = useCountry()
   const { state, update, remove } = useDataStore()
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
 
+  const [view,         setView]         = useState('charts')
   const [editRecord,   setEditRecord]   = useState(null)
   const [deleteRecord, setDeleteRecord] = useState(null)
 
-  const allYears = useMemo(
-    () => state.funding.filter(f => f.iso_3_code === selectedIso).sort((a, b) => a.year - b.year),
-    [state.funding, selectedIso],
-  )
+  const multiIso = selectedIsos.length > 1
+  const yLabel = !selectedYears.length || selectedYears.length === YEARS.length
+    ? 'All Years' : selectedYears.length === 1 ? String(selectedYears[0]) : `${selectedYears.length} Years`
 
-  const current = useMemo(
-    () => allYears.find(f => f.year === Number(selectedYear)) || null,
-    [allYears, selectedYear],
-  )
+  // Per-year aggregated funding across selected countries
+  const allYears = useMemo(() => {
+    const filtered = state.funding.filter(r => !selectedIsos.length || selectedIsos.includes(r.iso_3_code))
+    const byYear = {}
+    filtered.forEach(r => {
+      if (!byYear[r.year]) byYear[r.year] = { year: r.year, _n: 0, total_funding_usd: 0, domestic_funding_usd: 0, external_funding_usd: 0, funding_per_capita_usd: 0, domestic_funding_share_pct: 0 }
+      const b = byYear[r.year]
+      b._n++
+      b.total_funding_usd          += r.total_funding_usd          || 0
+      b.domestic_funding_usd       += r.domestic_funding_usd       || 0
+      b.external_funding_usd       += r.external_funding_usd       || 0
+      b.funding_per_capita_usd     += r.funding_per_capita_usd     || 0
+      b.domestic_funding_share_pct += r.domestic_funding_share_pct || 0
+    })
+    return Object.values(byYear).map(({ _n, funding_per_capita_usd, domestic_funding_share_pct, ...r }) => ({
+      ...r,
+      funding_per_capita_usd:     _n > 0 ? funding_per_capita_usd     / _n : 0,
+      domestic_funding_share_pct: _n > 0 ? domestic_funding_share_pct / _n : 0,
+    })).sort((a, b) => a.year - b.year)
+  }, [state.funding, selectedIsos])
 
-  if (!selectedIso) return <div className="page-empty">Select a country above.</div>
+  // KPI aggregate for selected years
+  const current = useMemo(() => {
+    const rows = allYears.filter(r => !selectedYears.length || selectedYears.includes(r.year))
+    if (!rows.length) return null
+    const n = rows.length
+    return {
+      total_funding_usd:          rows.reduce((s, r) => s + r.total_funding_usd,          0),
+      domestic_funding_usd:       rows.reduce((s, r) => s + r.domestic_funding_usd,       0),
+      external_funding_usd:       rows.reduce((s, r) => s + r.external_funding_usd,       0),
+      funding_per_capita_usd:     rows.reduce((s, r) => s + r.funding_per_capita_usd,     0) / n,
+      domestic_funding_share_pct: rows.reduce((s, r) => s + r.domestic_funding_share_pct, 0) / n,
+    }
+  }, [allYears, selectedYears])
+
+  // Raw rows for Data Table tab
+  const tableRows = useMemo(() =>
+    state.funding.filter(r =>
+      (!selectedIsos.length  || selectedIsos.includes(r.iso_3_code)) &&
+      (!selectedYears.length || selectedYears.includes(r.year))
+    ).sort((a, b) => a.year - b.year || a.iso_3_code.localeCompare(b.iso_3_code))
+  , [state.funding, selectedIsos, selectedYears])
+
+  if (!selectedIsos.length) return <div className="page-empty">Select a country above.</div>
 
   const domShare = current?.domestic_funding_share_pct ?? 0
   const extShare = 100 - domShare
@@ -77,16 +117,19 @@ export default function FundingDashboard() {
     <>
       <div className="page-header-slim">
         <h1 className="page-title">Health Financing</h1>
-        <p className="page-desc">Domestic &amp; external health funding · {selectedYear}</p>
+        <p className="page-desc">Domestic &amp; external health funding · {yLabel}</p>
       </div>
 
-      {/* KPI cards */}
+      <PageTabs view={view} onChange={setView} />
+
+      {view === 'charts' && <>
+
       <section className="section">
         <div className="kpi-grid kpi-grid-4">
           <div className="kpi-card" style={{ borderTop: '4px solid #0071BC', background: '#EBF5FF' }}>
             <div className="kpi-card-header"><span className="kpi-title">Total Funding</span></div>
             <div className="kpi-value" style={{ color: '#0071BC' }}>{fmtM(current?.total_funding_usd)}</div>
-            <div className="kpi-subtitle">{selectedYear}</div>
+            <div className="kpi-subtitle">{yLabel}</div>
           </div>
           <div className="kpi-card" style={{ borderTop: '4px solid #059669', background: '#ECFDF5' }}>
             <div className="kpi-card-header"><span className="kpi-title">Domestic</span></div>
@@ -101,7 +144,7 @@ export default function FundingDashboard() {
           <div className="kpi-card" style={{ borderTop: '4px solid #7B2D8B', background: '#F5F0FF' }}>
             <div className="kpi-card-header"><span className="kpi-title">Per Capita</span></div>
             <div className="kpi-value" style={{ color: '#7B2D8B' }}>${current?.funding_per_capita_usd?.toFixed(2) ?? '—'}</div>
-            <div className="kpi-subtitle">USD per person</div>
+            <div className="kpi-subtitle">avg USD per person</div>
           </div>
         </div>
       </section>
@@ -109,7 +152,7 @@ export default function FundingDashboard() {
       {current && (
         <section className="section">
           <div className="capacity-card">
-            <h3 className="capacity-title">Domestic vs External Split — {selectedYear}</h3>
+            <h3 className="capacity-title">Domestic vs External Split — {yLabel}</h3>
             <div className="funding-stacked-labels">
               <span>Domestic ({domShare.toFixed(1)}%)</span>
               <span>External ({extShare.toFixed(1)}%)</span>
@@ -136,7 +179,6 @@ export default function FundingDashboard() {
         </section>
       )}
 
-      {/* Trend charts */}
       <section className="section">
         <div className="charts-grid">
           <div className="card">
@@ -170,10 +212,7 @@ export default function FundingDashboard() {
                 <Tooltip formatter={v => [`${v?.toFixed(1)}%`]} />
                 <Bar dataKey="domestic_funding_share_pct" name="Domestic %" radius={[4, 4, 0, 0]}>
                   {allYears.map(r => (
-                    <Cell
-                      key={r.year}
-                      fill={r.domestic_funding_share_pct >= 50 ? '#059669' : r.domestic_funding_share_pct >= 30 ? '#D97706' : '#C00000'}
-                    />
+                    <Cell key={r.year} fill={r.domestic_funding_share_pct >= 50 ? '#059669' : r.domestic_funding_share_pct >= 30 ? '#D97706' : '#C00000'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -199,47 +238,63 @@ export default function FundingDashboard() {
         </div>
       </section>
 
-      {/* Data table */}
-      <section className="section">
-        <div className="card">
-          <div className="card-header"><h2 className="card-title">Funding Data by Year</h2></div>
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Year</th>
-                  <th>Total Funding</th>
-                  <th>Domestic</th>
-                  <th>External</th>
-                  <th>Per Capita (USD)</th>
-                  <th>Domestic Share %</th>
-                  {canEdit && <th className="actions-col">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {allYears.map(r => (
-                  <tr key={r.year} className={r.year === selectedYear ? 'row-highlighted' : ''}>
-                    <td><strong>{r.year}</strong>{r.year === selectedYear && <span className="year-badge">selected</span>}</td>
-                    <td className="num">{fmtM(r.total_funding_usd)}</td>
-                    <td className="num">{fmtM(r.domestic_funding_usd)}</td>
-                    <td className="num">{fmtM(r.external_funding_usd)}</td>
-                    <td className="num">${r.funding_per_capita_usd?.toFixed(2)}</td>
-                    <td className={`num ${r.domestic_funding_share_pct >= 50 ? 'text-success' : r.domestic_funding_share_pct < 30 ? 'text-danger' : 'text-warn'}`}>
-                      {r.domestic_funding_share_pct?.toFixed(1)}%
-                    </td>
-                    {canEdit && (
-                      <td className="actions-col">
-                        <EditBtn   onClick={() => setEditRecord(r)}   />
-                        <DeleteBtn onClick={() => setDeleteRecord(r)} />
-                      </td>
-                    )}
+      </>}
+
+      {view === 'table' && (
+        <section className="section">
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Funding Data — All Years</h2>
+              <span className="card-subtitle">{tableRows.length} records</span>
+            </div>
+            <div className="table-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    {multiIso && <th>Country</th>}
+                    <th>Total Funding</th>
+                    <th>Domestic</th>
+                    <th>External</th>
+                    <th>Per Capita (USD)</th>
+                    <th>Domestic Share %</th>
+                    {canEdit && !multiIso && <th className="actions-col">Actions</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {tableRows.length === 0 && (
+                    <tr><td colSpan={7} className="table-empty">No funding data found</td></tr>
+                  )}
+                  {tableRows.map(r => (
+                    <tr key={`${r.iso_3_code}-${r.year}`} className={selectedYears.includes(r.year) ? 'row-highlighted' : ''}>
+                      <td>
+                        <strong>{r.year}</strong>
+                        {selectedYears.includes(r.year) && selectedYears.length < YEARS.length && (
+                          <span className="year-badge">selected</span>
+                        )}
+                      </td>
+                      {multiIso && <td className="mono">{r.iso_3_code}</td>}
+                      <td className="num">{fmtM(r.total_funding_usd)}</td>
+                      <td className="num">{fmtM(r.domestic_funding_usd)}</td>
+                      <td className="num">{fmtM(r.external_funding_usd)}</td>
+                      <td className="num">${r.funding_per_capita_usd?.toFixed(2)}</td>
+                      <td className={`num ${r.domestic_funding_share_pct >= 50 ? 'text-success' : r.domestic_funding_share_pct < 30 ? 'text-danger' : 'text-warn'}`}>
+                        {r.domestic_funding_share_pct?.toFixed(1)}%
+                      </td>
+                      {canEdit && !multiIso && (
+                        <td className="actions-col">
+                          <EditBtn   onClick={() => setEditRecord(r)}   />
+                          <DeleteBtn onClick={() => setDeleteRecord(r)} />
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {editRecord && (
         <EditRecordModal
