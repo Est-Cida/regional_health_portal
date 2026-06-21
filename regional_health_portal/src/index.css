@@ -952,6 +952,248 @@ body {
 ::-webkit-scrollbar-thumb { background: #C5CFD9; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #9BAAB8; }
 
+/* ── Country sub-header ──────────────────────────────────────────────────── */
+
+.country-subheader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 24px;
+  background: white;
+  border-bottom: 1px solid var(--who-border);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.country-subheader-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.subheader-iso {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  background: var(--who-dark);
+  color: white;
+  padding: 3px 9px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.subheader-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--who-dark);
+}
+
+.subheader-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.subheader-tag {
+  font-size: 11px;
+  color: var(--who-muted);
+  background: #F0F4F8;
+  border-radius: 4px;
+  padding: 1px 7px;
+}
+
+.subheader-priority {
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid;
+}
+
+.country-subheader-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Year tabs */
+.year-tabs {
+  display: flex;
+  background: #F0F4F8;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.year-tab {
+  background: none;
+  border: none;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--who-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.year-tab:hover { background: white; color: var(--who-dark); }
+
+.year-tab.active {
+  background: var(--who-blue);
+  color: white;
+  box-shadow: 0 1px 4px rgba(0,113,188,.3);
+}
+
+/* ── Page header (slim, inside sub-pages) ────────────────────────────────── */
+
+.page-header-slim {
+  margin-bottom: 20px;
+}
+
+.page-empty {
+  text-align: center;
+  padding: 60px 24px;
+  color: var(--who-muted);
+  font-size: 14px;
+}
+
+/* ── 4-column KPI grid ───────────────────────────────────────────────────── */
+
+.kpi-grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1100px) { .kpi-grid-4 { grid-template-columns: repeat(2, 1fr); } }
+
+/* ── Quick-nav cards (Country Overview) ──────────────────────────────────── */
+
+.quicknav-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 1200px) { .quicknav-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 800px)  { .quicknav-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.quicknav-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: white;
+  border: 1px solid var(--who-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .15s, box-shadow .15s;
+}
+.quicknav-card:hover {
+  border-color: var(--who-blue);
+  box-shadow: var(--shadow-md);
+}
+
+.quicknav-icon  { font-size: 22px; flex-shrink: 0; line-height: 1; }
+.quicknav-title { font-size: 13px; font-weight: 700; color: var(--who-dark); margin-bottom: 3px; }
+.quicknav-desc  { font-size: 11.5px; color: var(--who-muted); line-height: 1.4; }
+
+/* ── Disease dot ─────────────────────────────────────────────────────────── */
+
+.disease-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* ── Single-disease KPI row ──────────────────────────────────────────────── */
+
+.disease-kpi-row {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--who-border);
+  overflow-x: auto;
+}
+
+.disease-kpi-cell {
+  flex: 1;
+  min-width: 100px;
+  padding: 12px 16px;
+  border-right: 1px solid var(--who-border);
+  text-align: center;
+}
+.disease-kpi-cell:last-child { border-right: none; }
+.disease-kpi-cell.highlighted { background: var(--who-blue-light); }
+
+.disease-kpi-year   { font-size: 11px; color: var(--who-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.disease-kpi-cases  { font-size: 20px; font-weight: 800; color: var(--who-dark); margin: 4px 0 2px; }
+.disease-kpi-label  { font-size: 10px; color: var(--who-muted); }
+.disease-kpi-deaths { font-size: 11.5px; color: var(--danger); font-weight: 600; margin-top: 3px; }
+.disease-kpi-cfr    { font-size: 11px; color: var(--who-muted); }
+
+/* ── Lab overview grid ───────────────────────────────────────────────────── */
+
+.lab-overview-grid {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.gauge-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.gauge-label {
+  font-size: 11px;
+  color: var(--who-muted);
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* ── Metric progress bar ─────────────────────────────────────────────────── */
+
+.metric-progress-row {
+  margin-bottom: 14px;
+}
+.metric-progress-row:last-child { margin-bottom: 0; }
+
+.metric-progress-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.metric-progress-label { font-size: 12.5px; color: var(--who-muted); }
+.metric-progress-value { font-size: 13px; font-weight: 700; }
+
+/* ── Table helpers ───────────────────────────────────────────────────────── */
+
+.text-success { color: var(--success) !important; }
+
+.row-highlighted { background: #F0F8FF !important; }
+
+.year-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  background: var(--who-blue);
+  color: white;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 /* ── Recharts tweak ──────────────────────────────────────────────────────── */
 
 .recharts-wrapper { padding: 16px 16px 8px; }

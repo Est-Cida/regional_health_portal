@@ -4,24 +4,35 @@ import { useAuth } from '../../context/AuthContext'
 
 const NAV_ITEMS = {
   country_admin: [
-    { to: '/country',          label: 'Country Overview',    icon: '🏛️' },
-    { to: '/country#diseases', label: 'Disease Surveillance',icon: '🦠' },
-    { to: '/country#outbreaks',label: 'Outbreaks',           icon: '⚠️' },
-    { to: '/country#capacity', label: 'Health Capacity',     icon: '🔬' },
-    { to: '/country#funding',  label: 'Funding',             icon: '💰' },
+    { to: '/country',            label: 'Country Overview',    icon: '🏛️', end: true  },
+    { to: '/country/diseases',   label: 'Disease Surveillance',icon: '🦠', end: false },
+    { to: '/country/outbreaks',  label: 'Outbreaks',           icon: '⚠️', end: false },
+    { to: '/country/laboratory', label: 'Laboratory',          icon: '🔬', end: false },
+    { to: '/country/capacity',   label: 'Health Capacity',     icon: '👥', end: false },
+    { to: '/country/funding',    label: 'Funding',             icon: '💰', end: false },
   ],
   regional_admin: [
-    { to: '/region',  label: 'Regional Overview', icon: '🗺️' },
-    { to: '/country', label: 'Country View',      icon: '🏛️' },
+    { to: '/region',             label: 'Regional Overview',   icon: '🗺️', end: true  },
+    { to: '/country',            label: 'Country View',        icon: '🏛️', end: true  },
+    { to: '/country/diseases',   label: 'Disease Surveillance',icon: '🦠', end: false },
+    { to: '/country/outbreaks',  label: 'Outbreaks',           icon: '⚠️', end: false },
+    { to: '/country/laboratory', label: 'Laboratory',          icon: '🔬', end: false },
+    { to: '/country/capacity',   label: 'Health Capacity',     icon: '👥', end: false },
+    { to: '/country/funding',    label: 'Funding',             icon: '💰', end: false },
   ],
   super_admin: [
-    { to: '/admin',   label: 'All Regions',  icon: '🌍' },
-    { to: '/region',  label: 'Regional View',icon: '🗺️' },
-    { to: '/country', label: 'Country View', icon: '🏛️' },
+    { to: '/admin',              label: 'All Regions',         icon: '🌍', end: true  },
+    { to: '/region',             label: 'Regional View',       icon: '🗺️', end: true  },
+    { to: '/country',            label: 'Country Overview',    icon: '🏛️', end: true  },
+    { to: '/country/diseases',   label: 'Disease Surveillance',icon: '🦠', end: false },
+    { to: '/country/outbreaks',  label: 'Outbreaks',           icon: '⚠️', end: false },
+    { to: '/country/laboratory', label: 'Laboratory',          icon: '🔬', end: false },
+    { to: '/country/capacity',   label: 'Health Capacity',     icon: '👥', end: false },
+    { to: '/country/funding',    label: 'Funding',             icon: '💰', end: false },
   ],
 }
 
-const EXPANDED_W = '240px'
+const EXPANDED_W  = '240px'
 const COLLAPSED_W = '64px'
 const STORAGE_KEY = 'who_sidebar_collapsed'
 
@@ -32,12 +43,8 @@ export default function Sidebar() {
     try { return sessionStorage.getItem(STORAGE_KEY) === 'true' } catch { return false }
   })
 
-  // Sync CSS variable on mount and on change
   useEffect(() => {
-    document.documentElement.style.setProperty(
-      '--sidebar-w',
-      collapsed ? COLLAPSED_W : EXPANDED_W,
-    )
+    document.documentElement.style.setProperty('--sidebar-w', collapsed ? COLLAPSED_W : EXPANDED_W)
     try { sessionStorage.setItem(STORAGE_KEY, collapsed) } catch {}
   }, [collapsed])
 
@@ -58,45 +65,34 @@ export default function Sidebar() {
             <ellipse cx="18" cy="18" rx="6" ry="13" stroke="white" strokeWidth="1.5" fill="none"/>
           </svg>
         </div>
-
         {!collapsed && (
           <div className="sidebar-brand-text">
             <div className="sidebar-brand-name">WHO AFRO</div>
             <div className="sidebar-brand-sub">Health Surveillance</div>
           </div>
         )}
-
         <button
           className="sidebar-toggle"
           onClick={() => setCollapsed(c => !c)}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {collapsed ? (
-            // Right-pointing chevron (expand)
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
-          ) : (
-            // Left-pointing chevron (collapse)
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-          )}
+          {collapsed
+            ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+          }
         </button>
       </div>
 
       {/* Nav */}
       <nav className="sidebar-nav">
         {!collapsed && <div className="sidebar-section-label">Navigation</div>}
-
         {items.map(item => (
           <NavLink
             key={item.to + item.label}
             to={item.to}
-            className={({ isActive }) =>
-              `sidebar-link${isActive && !item.to.includes('#') ? ' active' : ''}`
-            }
+            end={item.end}
+            className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
             title={collapsed ? item.label : undefined}
           >
             <span className="sidebar-icon">{item.icon}</span>
@@ -105,7 +101,7 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Footer / user info */}
+      {/* Footer */}
       <div className="sidebar-footer">
         <div className={`sidebar-user-info${collapsed ? ' sidebar-user-info-collapsed' : ''}`}>
           <div className="sidebar-avatar" title={collapsed ? user.full_name : undefined}>
@@ -123,7 +119,6 @@ export default function Sidebar() {
           )}
         </div>
       </div>
-
     </aside>
   )
 }
