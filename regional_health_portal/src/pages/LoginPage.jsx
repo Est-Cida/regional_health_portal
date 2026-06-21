@@ -2,14 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const DEMO_HINTS = [
-  { label: 'Country Admin (Nigeria)',      username: 'nga_admin',     desc: 'See only Nigeria data' },
-  { label: 'Country Admin (Kenya)',        username: 'ken_admin',     desc: 'See only Kenya data' },
-  { label: 'Regional Admin (West Africa)',  username: 'west_admin',    desc: 'See 7 West African countries' },
-  { label: 'Regional Admin (East Africa)', username: 'east_admin',    desc: 'See 5 East African countries' },
-  { label: 'Super Admin',                  username: 'super_admin',   desc: 'Full access to all 20 countries' },
-]
-
 const REDIRECT = {
   country_admin:  '/country',
   regional_admin: '/region',
@@ -36,12 +28,6 @@ export default function LoginPage() {
     } else {
       setError(result.error)
     }
-  }
-
-  const fillHint = (hint) => {
-    setUsername(hint.username)
-    setPassword('password123')
-    setError('')
   }
 
   return (
@@ -125,19 +111,6 @@ export default function LoginPage() {
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
-
-          {/* Demo accounts */}
-          <div className="demo-section">
-            <div className="demo-title">Demo accounts — password: <code>password123</code></div>
-            <div className="demo-hints">
-              {DEMO_HINTS.map(h => (
-                <button key={h.username} className="demo-hint-btn" onClick={() => fillHint(h)}>
-                  <div className="demo-hint-label">{h.label}</div>
-                  <div className="demo-hint-desc">{h.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
 
           <p className="login-footer">
             WHO African Region Office · Brazzaville, Congo
