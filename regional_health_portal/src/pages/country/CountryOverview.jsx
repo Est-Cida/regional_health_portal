@@ -8,8 +8,23 @@ import DiseaseBarChart from '../../components/charts/DiseaseBarChart'
 import TrendLineChart from '../../components/charts/TrendLineChart'
 import PageTabs from '../../components/PageTabs'
 import { YEARS } from '../../data/dataService'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend,
+} from 'recharts'
 
-const fmtM = v => v != null ? `$${(v / 1_000_000).toFixed(1)}M` : '—'
+const fmtM   = v => v != null ? `$${(v / 1_000_000).toFixed(1)}M` : '—'
+const fmtNum = v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
+
+const DISEASE_COLORS = {
+  'Cholera':                   '#0071BC',
+  'Measles':                   '#F7941D',
+  'Meningitis':                '#7B2D8B',
+  'Yellow fever':              '#D4A017',
+  'Lassa fever':               '#C00000',
+  'Viral haemorrhagic fever':  '#8B0000',
+  'Polio (cVDPV)':             '#059669',
+}
 
 function yearLabel(selectedYears) {
   if (!selectedYears.length || selectedYears.length === YEARS.length) return 'All Years'
@@ -18,7 +33,7 @@ function yearLabel(selectedYears) {
 }
 
 export default function CountryOverview() {
-  const { selectedIsos, selectedYears, selectedDiseases, allDiseases } = useCountry()
+  const { selectedIsos, selectedYears, selectedDiseases, allDiseases, availableCountries } = useCountry()
   const { state } = useDataStore()
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -91,6 +106,33 @@ export default function CountryOverview() {
     return { iso15189_accreditation_pct: rows.reduce((s, r) => s + (r.iso15189_accreditation_pct || 0), 0) / rows.length }
   }, [state.labCapacity, selectedIsos, selectedYears])
 
+  // Disease burden per country (for stacked bar — only meaningful when >1 country selected)
+  const isoToName = useMemo(() => {
+    const map = {}
+    availableCountries.forEach(c => { map[c.iso_3_code] = c.country_name })
+    return map
+  }, [availableCountries])
+
+  const activeDiseases = allSelected ? allDiseases : selectedDiseases
+
+  const burdenByCountry = useMemo(() => {
+    if (selectedIsos.length <= 1) return []
+    return selectedIsos.map(iso => {
+      const rows = filteredSurv.filter(s =>
+        s.iso_3_code === iso &&
+        (!selectedYears.length || selectedYears.includes(s.year))
+      )
+      const entry = { country: isoToName[iso] || iso }
+      activeDiseases.forEach(d => {
+        entry[d] = rows
+          .filter(r => r.disease === d)
+          .reduce((s, r) => s + (r.cases_reported || 0), 0)
+      })
+      entry._total = activeDiseases.reduce((s, d) => s + (entry[d] || 0), 0)
+      return entry
+    }).sort((a, b) => b._total - a._total)
+  }, [filteredSurv, selectedIsos, selectedYears, activeDiseases, isoToName])
+
   // Multi-year summary rows for the Summary Table tab
   const summaryRows = useMemo(() =>
     [...YEARS].reverse().map(year => {
@@ -153,6 +195,52 @@ export default function CountryOverview() {
               <TrendLineChart data={trend} />
             </div>
           </div>
+
+          {/* Disease Burden by Country — shown only when multiple countries selected */}
+          {selectedIsos.length > 1 && burdenByCountry.length > 0 && (
+            <div className="section">
+              <div className="card">
+                <div className="card-header">
+                  <h2 className="card-title">Disease Burden by Country — {yLabel}</h2>
+                  <button className="btn-link" onClick={() => navigate('/country/diseases')}>View detail →</button>
+                </div>
+                <ResponsiveContainer width="100%" height={Math.max(300, selectedIsos.length * 42) + 48}>
+                  <BarChart
+                    data={burdenByCountry}
+                    layout="vertical"
+                    margin={{ top: 48, right: 32, left: 4, bottom: 4 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
+                    <XAxis type="number" tickFormatter={fmtNum} tick={{ fontSize: 11, fill: '#6B7C93' }} />
+                    <YAxis
+                      type="category"
+                      dataKey="country"
+                      width={160}
+                      tick={{ fontSize: 11, fill: '#1A2B4A' }}
+                    />
+                    <Tooltip
+                      formatter={(v, name) => [v.toLocaleString(), name]}
+                      contentStyle={{ fontSize: 12 }}
+                    />
+                    <Legend
+                      verticalAlign="top"
+                      height={40}
+                      wrapperStyle={{ fontSize: 11, top: 0, paddingBottom: 4 }}
+                    />
+                    {activeDiseases.map(d => (
+                      <Bar
+                        key={d}
+                        dataKey={d}
+                        stackId="a"
+                        fill={DISEASE_COLORS[d] || '#6B7C93'}
+                        name={d}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
 
           <div className="section">
             <h2 className="section-heading">Explore Sections</h2>
