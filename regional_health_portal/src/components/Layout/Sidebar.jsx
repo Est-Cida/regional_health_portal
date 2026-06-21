@@ -57,18 +57,13 @@ export default function Sidebar() {
 
       {/* Brand + toggle */}
       <div className="sidebar-brand">
-        <div className="sidebar-logo" style={{ flexShrink: 0 }}>
-          <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-            <circle cx="18" cy="18" r="17" fill="#0071BC"/>
-            <circle cx="18" cy="18" r="13" stroke="white" strokeWidth="1.5" fill="none"/>
-            <line x1="4" y1="18" x2="32" y2="18" stroke="white" strokeWidth="1.5"/>
-            <ellipse cx="18" cy="18" rx="6" ry="13" stroke="white" strokeWidth="1.5" fill="none"/>
-          </svg>
-        </div>
+        
+          <img src="/WHO-icon.png" alt="" href="/WHO-icon.png"/>
+        
         {!collapsed && (
           <div className="sidebar-brand-text">
             <div className="sidebar-brand-name">WHO AFRO</div>
-            <div className="sidebar-brand-sub">Health Surveillance</div>
+            <div className="sidebar-brand-sub">Regional Health Portal</div>
           </div>
         )}
         <button

@@ -782,7 +782,7 @@ body {
 
 .login-hero-content { max-width: 380px; }
 
-.login-globe { margin-bottom: 24px; }
+.login-globe { margin-bottom: 24px; width: 80px; height: 80px; }
 
 .login-hero-title {
   font-size: 32px;
