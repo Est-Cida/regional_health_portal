@@ -63,7 +63,7 @@ export default function RegionalMap({ overview, metric = 'totalCases', year, sub
       <MapContainer
         center={[5, 20]}
         zoom={4}
-        style={{ height: '440px', width: '100%', borderRadius: '0 0 8px 8px' }}
+        style={{ height: '680px', width: '100%', borderRadius: '0 0 8px 8px' }}
         scrollWheelZoom={false}
         zoomControl={true}
       >
