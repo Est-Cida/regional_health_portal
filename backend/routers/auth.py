@@ -1,16 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from database import get_db
 from models import User
 from auth import verify_password, create_access_token, get_current_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
 
 
 class TokenResponse(BaseModel):
@@ -20,9 +16,10 @@ class TokenResponse(BaseModel):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == body.email.strip().lower()).first()
-    if not user or not verify_password(body.password, user.hashed_password):
+def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # form.username carries the email address submitted from the login form
+    user = db.query(User).filter(User.email == form.username.strip().lower()).first()
+    if not user or not verify_password(form.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
