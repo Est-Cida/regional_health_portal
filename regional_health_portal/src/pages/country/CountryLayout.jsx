@@ -13,8 +13,10 @@ const PRIORITY_LABEL = { 1: 'High Priority', 2: 'Medium Priority', 3: 'Standard'
 function CountrySubHeader() {
   const { user } = useAuth()
   const {
-    selectedIsos, setSelectedIsos,
-    selectedYears, setSelectedYears,
+    selectedIsos,     setSelectedIsos,
+    selectedYears,    setSelectedYears,
+    selectedDiseases, setSelectedDiseases,
+    allDiseases,
     country, availableCountries,
   } = useCountry()
 
@@ -61,6 +63,13 @@ function CountrySubHeader() {
             allLabel="All Countries"
           />
         )}
+        <MultiSelectDropdown
+          options={allDiseases.map(d => ({ value: d, label: d }))}
+          selected={selectedDiseases}
+          onChange={setSelectedDiseases}
+          placeholder="Select disease…"
+          allLabel="All Diseases"
+        />
         <MultiSelectDropdown
           options={YEARS.map(y => ({ value: y, label: String(y) }))}
           selected={selectedYears}

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useCountry } from '../../context/CountryContext'
 import { useDataStore, rowId } from '../../context/DataStore'
 import { useAuth } from '../../context/AuthContext'
-import { getDiseaseList, YEARS } from '../../data/dataService'
+import { YEARS } from '../../data/dataService'
 import EditRecordModal from '../../components/EditRecordModal'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import PageTabs from '../../components/PageTabs'
@@ -63,7 +63,7 @@ function DeleteBtn({ onClick }) {
 }
 
 export default function DiseaseDashboard() {
-  const { selectedIsos, selectedYears } = useCountry()
+  const { selectedIsos, selectedYears, selectedDiseases, allDiseases: ALL_DISEASES } = useCountry()
   const { state, update, remove } = useDataStore()
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
@@ -76,13 +76,15 @@ export default function DiseaseDashboard() {
   const yLabel = !selectedYears.length || selectedYears.length === YEARS.length
     ? 'All Years' : selectedYears.length === 1 ? String(selectedYears[0]) : `${selectedYears.length} Years`
 
-  const allDiseases = useMemo(() => getDiseaseList(), [])
+  const allDiseases = ALL_DISEASES
+  const allDiseasesSelected = selectedDiseases.length === allDiseases.length
 
-  // Disease summary: aggregate by disease for selected isos + years
+  // Disease summary: aggregate by disease for selected isos + years + diseases
   const diseases = useMemo(() => {
     const rows = state.surveillance.filter(s =>
       (!selectedIsos.length  || selectedIsos.includes(s.iso_3_code)) &&
-      (!selectedYears.length || selectedYears.includes(s.year))
+      (!selectedYears.length || selectedYears.includes(s.year)) &&
+      (allDiseasesSelected   || selectedDiseases.includes(s.disease))
     )
     const byDisease = {}
     rows.forEach(s => {
@@ -102,18 +104,19 @@ export default function DiseaseDashboard() {
     }))
   }, [state.surveillance, selectedIsos, selectedYears])
 
-  // Multi-disease trend matrix (cases per year, summed across selected countries)
+  // Multi-disease trend matrix — only show selected diseases
   const matrix = useMemo(() =>
     YEARS.map(year => {
       const row = { year }
       allDiseases.forEach(d => {
+        if (!allDiseasesSelected && !selectedDiseases.includes(d)) return
         const entries = state.surveillance.filter(
           s => (!selectedIsos.length || selectedIsos.includes(s.iso_3_code)) && s.year === year && s.disease === d
         )
         row[d] = entries.reduce((sum, e) => sum + (e.cases_reported ?? 0), 0)
       })
       return row
-    }), [state.surveillance, selectedIsos, allDiseases])
+    }), [state.surveillance, selectedIsos, allDiseases, selectedDiseases, allDiseasesSelected])
 
   // Single disease 5-year trend
   const diseaseTrend = useMemo(() => {
@@ -137,9 +140,10 @@ export default function DiseaseDashboard() {
   const allSurvRows = useMemo(() =>
     state.surveillance.filter(s =>
       (!selectedIsos.length  || selectedIsos.includes(s.iso_3_code)) &&
-      (!selectedYears.length || selectedYears.includes(s.year))
+      (!selectedYears.length || selectedYears.includes(s.year)) &&
+      (allDiseasesSelected   || selectedDiseases.includes(s.disease))
     ).sort((a, b) => b.year - a.year || a.iso_3_code.localeCompare(b.iso_3_code) || a.disease.localeCompare(b.disease))
-  , [state.surveillance, selectedIsos, selectedYears])
+  , [state.surveillance, selectedIsos, selectedYears, selectedDiseases, allDiseasesSelected])
 
   function handleSaveEdit(changes) {
     update('surveillance', rowId('surveillance', editRecord), changes)

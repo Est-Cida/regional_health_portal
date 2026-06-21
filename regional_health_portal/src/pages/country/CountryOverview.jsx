@@ -18,7 +18,7 @@ function yearLabel(selectedYears) {
 }
 
 export default function CountryOverview() {
-  const { selectedIsos, selectedYears } = useCountry()
+  const { selectedIsos, selectedYears, selectedDiseases, allDiseases } = useCountry()
   const { state } = useDataStore()
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -27,11 +27,14 @@ export default function CountryOverview() {
 
   const yLabel = yearLabel(selectedYears)
 
-  // All surveillance rows for selected countries
+  const allSelected = selectedDiseases.length === allDiseases.length
+
+  // All surveillance rows for selected countries + diseases
   const filteredSurv = useMemo(() =>
     state.surveillance.filter(s =>
-      (!selectedIsos.length || selectedIsos.includes(s.iso_3_code))
-    ), [state.surveillance, selectedIsos])
+      (!selectedIsos.length || selectedIsos.includes(s.iso_3_code)) &&
+      (allSelected || selectedDiseases.includes(s.disease))
+    ), [state.surveillance, selectedIsos, selectedDiseases, allSelected])
 
   // Summary for selected years (KPI cards + disease bar chart)
   const summary = useMemo(() => {
