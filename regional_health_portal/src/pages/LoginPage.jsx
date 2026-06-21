@@ -2,24 +2,49 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
+const ALLOWED_DOMAINS = ['gmail.com', 'yahoo.com', 'who.int']
+
 const REDIRECT = {
   country_admin:  '/country',
   regional_admin: '/region',
   super_admin:    '/admin',
 }
 
+function validateEmail(email) {
+  if (!email) return 'Email is required'
+  const match = email.trim().match(/^[^\s@]+@([^\s@]+)$/)
+  if (!match) return 'Enter a valid email address'
+  if (!ALLOWED_DOMAINS.includes(match[1].toLowerCase())) {
+    return `Only @gmail.com, @yahoo.com or @who.int addresses are accepted`
+  }
+  return null
+}
+
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
+  const [username,   setUsername]   = useState('')
+  const [email,      setEmail]      = useState('')
+  const [password,   setPassword]   = useState('')
+  const [emailError, setEmailError] = useState('')
+  const [error,      setError]      = useState('')
+  const [loading,    setLoading]    = useState(false)
+
+  const handleEmailBlur = () => {
+    setEmailError(validateEmail(email) || '')
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+
+    const emailErr = validateEmail(email)
+    if (emailErr) {
+      setEmailError(emailErr)
+      return
+    }
+
     setLoading(true)
     const result = await login(username.trim(), password)
     setLoading(false)
@@ -92,6 +117,23 @@ export default function LoginPage() {
                 placeholder="e.g. nga_admin"
                 required
               />
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="email">Email address</label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={e => { setEmail(e.target.value); if (emailError) setEmailError('') }}
+                onBlur={handleEmailBlur}
+                placeholder="you@gmail.com"
+                required
+                className={emailError ? 'input-error' : ''}
+              />
+              {emailError && <span className="field-error">{emailError}</span>}
+              <span className="field-hint">Accepted: @gmail.com · @yahoo.com · @who.int</span>
             </div>
 
             <div className="form-field">
