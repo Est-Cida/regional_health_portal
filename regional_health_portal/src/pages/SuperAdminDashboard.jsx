@@ -5,6 +5,7 @@ import Sidebar from '../components/Layout/Sidebar'
 import MultiSelectDropdown from '../components/MultiSelectDropdown'
 import {
   getCountries,
+  getDiseaseList,
   SUBREGIONS,
   YEARS,
   getRawSurveillance,
@@ -28,10 +29,21 @@ const REGION_COLORS = {
 const PRIORITY_LABEL = { 1: 'High', 2: 'Medium', 3: 'Standard' }
 const PRIORITY_COLOR = { 1: '#C00000', 2: '#D97706', 3: '#059669' }
 
+const DISEASE_COLORS = {
+  'Cholera':                    '#0071BC',
+  'Measles':                    '#F7941D',
+  'Meningitis':                 '#7B2D8B',
+  'Yellow fever':               '#D4A017',
+  'Lassa fever':                '#C00000',
+  'Viral haemorrhagic fever':   '#8B0000',
+  'Polio (cVDPV)':              '#059669',
+}
+
 const fmtNum  = v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
 const fmtMill = v => v != null ? `$${(v / 1_000_000).toFixed(1)}M` : '—'
 
 const ALL_COUNTRIES    = getCountries()
+const ALL_DISEASES     = getDiseaseList()
 const RAW_SURVEILLANCE = getRawSurveillance()
 const RAW_OUTBREAKS    = getRawOutbreaks()
 const RAW_LAB          = getRawLabCapacity()
@@ -49,6 +61,7 @@ export default function SuperAdminDashboard() {
   const [selectedYears,   setSelectedYears]   = useState([2024])
   const [filterSubregion, setFilterSubregion] = useState('All')
   const [tab,             setTab]             = useState('overview')
+  const [tableMode,       setTableMode]       = useState('country')  // 'country' | 'disease'
 
   const allYearsSelected = selectedYears.length === YEARS.length
 
@@ -103,6 +116,37 @@ export default function SuperAdminDashboard() {
     })
   }, [selectedYears, allYearsSelected])
 
+  // Per-country disease-level breakdown
+  const countryDiseaseData = useMemo(() => {
+    return ALL_COUNTRIES.map(c => {
+      const iso3 = c.iso_3_code
+      const survRows = RAW_SURVEILLANCE.filter(s =>
+        s.iso_3_code === iso3 &&
+        (allYearsSelected || selectedYears.includes(s.year))
+      )
+      const byDisease = {}
+      survRows.forEach(r => {
+        if (!byDisease[r.disease]) byDisease[r.disease] = { disease: r.disease, cases: 0, deaths: 0, _cfrSum: 0, _n: 0 }
+        byDisease[r.disease].cases   += (r.cases_reported          || 0)
+        byDisease[r.disease].deaths  += (r.deaths_reported         || 0)
+        byDisease[r.disease]._cfrSum += (r.case_fatality_ratio_pct || 0)
+        byDisease[r.disease]._n      += 1
+      })
+      const diseases = Object.values(byDisease).map(({ _cfrSum, _n, ...d }) => ({
+        ...d, avgCFR: _n > 0 ? _cfrSum / _n : 0,
+      })).sort((a, b) => b.cases - a.cases)
+
+      return {
+        iso3,
+        country_name: c.country_name,
+        subregion:    c.afro_subregion,
+        priority:     c.priority_country,
+        totalCases:   diseases.reduce((s, d) => s + d.cases, 0),
+        diseases,
+      }
+    })
+  }, [selectedYears, allYearsSelected])
+
   // AFRO-level KPI totals
   const afroTotals = useMemo(() => {
     const totalCases  = countryData.reduce((s, c) => s + c.totalCases,  0)
@@ -127,39 +171,46 @@ export default function SuperAdminDashboard() {
       }
     }), [countryData])
 
-  // Countries grouped by sub-region for the Country Summary table
+  // Countries grouped for the Country-mode table
   const grouped = useMemo(() => {
     const base = filterSubregion === 'All'
       ? countryData
       : countryData.filter(c => c.subregion === filterSubregion)
 
-    return SUBREGIONS
-      .map(sub => {
-        const rows = base
-          .filter(c => c.subregion === sub)
-          .sort((a, b) => b.totalCases - a.totalCases)
-        if (!rows.length) return null
-
-        const validLab  = rows.filter(c => c.avgLabAccred != null)
-        const validEpi  = rows.filter(c => c.totalEpi     != null)
-        const validFund = rows.filter(c => c.totalFunding  != null)
-
-        return {
-          subregion: sub,
-          rows,
-          subtotal: {
-            totalCases:    rows.reduce((s, c) => s + c.totalCases,  0),
-            totalDeaths:   rows.reduce((s, c) => s + c.totalDeaths, 0),
-            avgCFR:        rows.reduce((s, c) => s + c.avgCFR, 0) / rows.length,
-            outbreakCount: rows.reduce((s, c) => s + c.outbreakCount, 0),
-            avgLabAccred:  validLab.length  ? validLab.reduce((s, c) => s + c.avgLabAccred,  0) / validLab.length : null,
-            totalEpi:      validEpi.length  ? validEpi.reduce((s, c) => s + c.totalEpi,     0) : null,
-            totalFunding:  validFund.length ? validFund.reduce((s, c) => s + c.totalFunding, 0) : null,
-          },
-        }
-      })
-      .filter(Boolean)
+    return SUBREGIONS.map(sub => {
+      const rows = base.filter(c => c.subregion === sub).sort((a, b) => b.totalCases - a.totalCases)
+      if (!rows.length) return null
+      const validLab  = rows.filter(c => c.avgLabAccred != null)
+      const validEpi  = rows.filter(c => c.totalEpi     != null)
+      const validFund = rows.filter(c => c.totalFunding  != null)
+      return {
+        subregion: sub,
+        rows,
+        subtotal: {
+          totalCases:    rows.reduce((s, c) => s + c.totalCases,  0),
+          totalDeaths:   rows.reduce((s, c) => s + c.totalDeaths, 0),
+          avgCFR:        rows.reduce((s, c) => s + c.avgCFR, 0) / rows.length,
+          outbreakCount: rows.reduce((s, c) => s + c.outbreakCount, 0),
+          avgLabAccred:  validLab.length  ? validLab.reduce((s, c) => s + c.avgLabAccred,  0) / validLab.length : null,
+          totalEpi:      validEpi.length  ? validEpi.reduce((s, c) => s + c.totalEpi,     0) : null,
+          totalFunding:  validFund.length ? validFund.reduce((s, c) => s + c.totalFunding, 0) : null,
+        },
+      }
+    }).filter(Boolean)
   }, [countryData, filterSubregion])
+
+  // Countries grouped for the Disease-mode table
+  const groupedDisease = useMemo(() => {
+    const base = filterSubregion === 'All'
+      ? countryDiseaseData
+      : countryDiseaseData.filter(c => c.subregion === filterSubregion)
+
+    return SUBREGIONS.map(sub => {
+      const rows = base.filter(c => c.subregion === sub).sort((a, b) => b.totalCases - a.totalCases)
+      if (!rows.length) return null
+      return { subregion: sub, rows }
+    }).filter(Boolean)
+  }, [countryDiseaseData, filterSubregion])
 
   const yLabel = yearLabel(selectedYears)
 
@@ -289,7 +340,6 @@ export default function SuperAdminDashboard() {
                 </div>
               </section>
 
-              {/* Sub-region drill-down cards */}
               <section className="section">
                 <h2 className="section-heading">Sub-region Summary</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
@@ -326,9 +376,24 @@ export default function SuperAdminDashboard() {
               <div className="card">
                 <div className="card-header">
                   <h2 className="card-title">
-                    All AFRO Countries — Multi-Indicator Summary — {yLabel}
+                    All AFRO Countries — {tableMode === 'disease' ? 'Disease Breakdown' : 'Multi-Indicator Summary'} — {yLabel}
                   </h2>
-                  <div className="card-filters">
+                  <div className="card-filters" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {/* View mode toggle */}
+                    <div className="map-metric-toggle">
+                      <button
+                        className={`map-metric-btn${tableMode === 'country' ? ' active' : ''}`}
+                        onClick={() => setTableMode('country')}
+                      >
+                        Country Totals
+                      </button>
+                      <button
+                        className={`map-metric-btn${tableMode === 'disease' ? ' active' : ''}`}
+                        onClick={() => setTableMode('disease')}
+                      >
+                        By Disease
+                      </button>
+                    </div>
                     <select
                       className="select-control select-sm"
                       value={filterSubregion}
@@ -342,122 +407,203 @@ export default function SuperAdminDashboard() {
                   </div>
                 </div>
 
-                <div className="table-wrapper">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Country</th>
-                        <th>Priority</th>
-                        <th>Cases</th>
-                        <th>Deaths</th>
-                        <th>CFR&nbsp;%</th>
-                        <th>Outbreaks</th>
-                        <th>Lab&nbsp;Accred&nbsp;%</th>
-                        <th>Epidemiologists</th>
-                        <th>Total&nbsp;Funding</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {grouped.map(({ subregion, rows, subtotal }) => (
-                        <>
-                          {/* Sub-region label row */}
-                          <tr
-                            key={`hdr-${subregion}`}
-                            style={{
-                              background: REGION_COLORS[subregion] + '18',
-                              borderLeft: `4px solid ${REGION_COLORS[subregion]}`,
-                            }}
-                          >
-                            <td
-                              colSpan={10}
-                              style={{ fontWeight: 700, color: REGION_COLORS[subregion], fontSize: 13, padding: '8px 12px' }}
+                {/* ── Country Totals table ── */}
+                {tableMode === 'country' && (
+                  <div className="table-wrapper">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Country</th>
+                          <th>Priority</th>
+                          <th>Cases</th>
+                          <th>Deaths</th>
+                          <th>CFR&nbsp;%</th>
+                          <th>Outbreaks</th>
+                          <th>Lab&nbsp;Accred&nbsp;%</th>
+                          <th>Epidemiologists</th>
+                          <th>Total&nbsp;Funding</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {grouped.map(({ subregion, rows, subtotal }) => (
+                          <>
+                            <tr
+                              key={`hdr-${subregion}`}
+                              style={{ background: REGION_COLORS[subregion] + '18', borderLeft: `4px solid ${REGION_COLORS[subregion]}` }}
                             >
-                              {subregion} Africa &mdash; {rows.length} {rows.length === 1 ? 'country' : 'countries'}
-                            </td>
-                          </tr>
-
-                          {/* Country rows */}
-                          {rows.map(c => (
-                            <tr key={c.iso3}>
-                              <td>
-                                <strong>{c.country_name}</strong>
-                                <span className="mono ml-1" style={{ color: '#6B7C93', fontSize: 11 }}>{c.iso3}</span>
-                              </td>
-                              <td>
-                                <span
-                                  className="priority-badge"
-                                  style={{ color: PRIORITY_COLOR[c.priority], borderColor: PRIORITY_COLOR[c.priority] + '55' }}
-                                >
-                                  {PRIORITY_LABEL[c.priority]}
-                                </span>
-                              </td>
-                              <td className="num">{c.totalCases.toLocaleString()}</td>
-                              <td className="num">{c.totalDeaths.toLocaleString()}</td>
-                              <td className={`num ${c.avgCFR > 10 ? 'text-danger' : c.avgCFR > 5 ? 'text-warn' : ''}`}>
-                                {c.avgCFR.toFixed(2)}%
-                              </td>
-                              <td className="num">{c.outbreakCount}</td>
-                              <td className={`num ${c.avgLabAccred != null ? (c.avgLabAccred >= 80 ? 'text-success' : c.avgLabAccred < 50 ? 'text-danger' : 'text-warn') : ''}`}>
-                                {c.avgLabAccred != null ? `${c.avgLabAccred.toFixed(1)}%` : '—'}
-                              </td>
-                              <td className="num">{c.totalEpi != null ? Math.round(c.totalEpi).toLocaleString() : '—'}</td>
-                              <td className="num">{c.totalFunding != null ? fmtMill(c.totalFunding) : '—'}</td>
-                              <td>
-                                <button className="btn-link" onClick={() => navigate('/country')}>
-                                  View →
-                                </button>
+                              <td colSpan={10} style={{ fontWeight: 700, color: REGION_COLORS[subregion], fontSize: 13, padding: '8px 12px' }}>
+                                {subregion} Africa &mdash; {rows.length} {rows.length === 1 ? 'country' : 'countries'}
                               </td>
                             </tr>
-                          ))}
-
-                          {/* Sub-region subtotal row */}
-                          <tr
-                            key={`sub-${subregion}`}
-                            style={{ background: REGION_COLORS[subregion] + '10', fontWeight: 600 }}
-                          >
-                            <td style={{ color: REGION_COLORS[subregion], paddingLeft: 20 }}>
-                              {subregion} Subtotal
-                            </td>
+                            {rows.map(c => (
+                              <tr key={c.iso3}>
+                                <td>
+                                  <strong>{c.country_name}</strong>
+                                  <span className="mono ml-1" style={{ color: '#6B7C93', fontSize: 11 }}>{c.iso3}</span>
+                                </td>
+                                <td>
+                                  <span className="priority-badge" style={{ color: PRIORITY_COLOR[c.priority], borderColor: PRIORITY_COLOR[c.priority] + '55' }}>
+                                    {PRIORITY_LABEL[c.priority]}
+                                  </span>
+                                </td>
+                                <td className="num">{c.totalCases.toLocaleString()}</td>
+                                <td className="num">{c.totalDeaths.toLocaleString()}</td>
+                                <td className={`num ${c.avgCFR > 10 ? 'text-danger' : c.avgCFR > 5 ? 'text-warn' : ''}`}>
+                                  {c.avgCFR.toFixed(2)}%
+                                </td>
+                                <td className="num">{c.outbreakCount}</td>
+                                <td className={`num ${c.avgLabAccred != null ? (c.avgLabAccred >= 80 ? 'text-success' : c.avgLabAccred < 50 ? 'text-danger' : 'text-warn') : ''}`}>
+                                  {c.avgLabAccred != null ? `${c.avgLabAccred.toFixed(1)}%` : '—'}
+                                </td>
+                                <td className="num">{c.totalEpi != null ? Math.round(c.totalEpi).toLocaleString() : '—'}</td>
+                                <td className="num">{c.totalFunding != null ? fmtMill(c.totalFunding) : '—'}</td>
+                                <td><button className="btn-link" onClick={() => navigate('/country')}>View →</button></td>
+                              </tr>
+                            ))}
+                            <tr key={`sub-${subregion}`} style={{ background: REGION_COLORS[subregion] + '10', fontWeight: 600 }}>
+                              <td style={{ color: REGION_COLORS[subregion], paddingLeft: 20 }}>{subregion} Subtotal</td>
+                              <td></td>
+                              <td className="num">{subtotal.totalCases.toLocaleString()}</td>
+                              <td className="num">{subtotal.totalDeaths.toLocaleString()}</td>
+                              <td className="num">{subtotal.avgCFR.toFixed(2)}%</td>
+                              <td className="num">{subtotal.outbreakCount}</td>
+                              <td className="num">{subtotal.avgLabAccred != null ? `${subtotal.avgLabAccred.toFixed(1)}%` : '—'}</td>
+                              <td className="num">{subtotal.totalEpi != null ? Math.round(subtotal.totalEpi).toLocaleString() : '—'}</td>
+                              <td className="num">{subtotal.totalFunding != null ? fmtMill(subtotal.totalFunding) : '—'}</td>
+                              <td></td>
+                            </tr>
+                          </>
+                        ))}
+                        {filterSubregion === 'All' && (
+                          <tr style={{ background: '#1A2B4A', color: '#fff', fontWeight: 700 }}>
+                            <td style={{ color: '#fff' }}>AFRO TOTAL</td>
                             <td></td>
-                            <td className="num">{subtotal.totalCases.toLocaleString()}</td>
-                            <td className="num">{subtotal.totalDeaths.toLocaleString()}</td>
-                            <td className="num">{subtotal.avgCFR.toFixed(2)}%</td>
-                            <td className="num">{subtotal.outbreakCount}</td>
-                            <td className="num">
-                              {subtotal.avgLabAccred != null ? `${subtotal.avgLabAccred.toFixed(1)}%` : '—'}
-                            </td>
-                            <td className="num">
-                              {subtotal.totalEpi != null ? Math.round(subtotal.totalEpi).toLocaleString() : '—'}
-                            </td>
-                            <td className="num">
-                              {subtotal.totalFunding != null ? fmtMill(subtotal.totalFunding) : '—'}
-                            </td>
+                            <td className="num">{afroTotals.totalCases.toLocaleString()}</td>
+                            <td className="num">{afroTotals.totalDeaths.toLocaleString()}</td>
+                            <td className="num">{afroTotals.cfr !== '—' ? `${afroTotals.cfr}%` : '—'}</td>
+                            <td className="num">{afroTotals.totalObs}</td>
+                            <td className="num">—</td>
+                            <td className="num">—</td>
+                            <td className="num">—</td>
                             <td></td>
                           </tr>
-                        </>
-                      ))}
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
-                      {/* AFRO Grand Total — only when all sub-regions shown */}
-                      {filterSubregion === 'All' && (
-                        <tr style={{ background: '#1A2B4A', color: '#fff', fontWeight: 700 }}>
-                          <td style={{ color: '#fff' }}>AFRO TOTAL</td>
-                          <td></td>
-                          <td className="num">{afroTotals.totalCases.toLocaleString()}</td>
-                          <td className="num">{afroTotals.totalDeaths.toLocaleString()}</td>
-                          <td className="num">
-                            {afroTotals.cfr !== '—' ? `${afroTotals.cfr}%` : '—'}
-                          </td>
-                          <td className="num">{afroTotals.totalObs}</td>
-                          <td className="num">—</td>
-                          <td className="num">—</td>
-                          <td className="num">—</td>
-                          <td></td>
+                {/* ── By Disease table ── */}
+                {tableMode === 'disease' && (
+                  <div className="table-wrapper">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Country</th>
+                          <th>Disease</th>
+                          <th>Priority</th>
+                          <th>Cases</th>
+                          <th>Deaths</th>
+                          <th>CFR&nbsp;%</th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {groupedDisease.map(({ subregion, rows }) => (
+                          <>
+                            {/* Sub-region header */}
+                            <tr
+                              key={`dhdr-${subregion}`}
+                              style={{ background: REGION_COLORS[subregion] + '18', borderLeft: `4px solid ${REGION_COLORS[subregion]}` }}
+                            >
+                              <td colSpan={6} style={{ fontWeight: 700, color: REGION_COLORS[subregion], fontSize: 13, padding: '8px 12px' }}>
+                                {subregion} Africa &mdash; {rows.length} {rows.length === 1 ? 'country' : 'countries'}
+                              </td>
+                            </tr>
+
+                            {rows.map(c => (
+                              <>
+                                {/* Disease rows */}
+                                {c.diseases.map((d, i) => (
+                                  <tr key={`${c.iso3}-${d.disease}`}>
+                                    {/* Country cell spans first disease row only */}
+                                    {i === 0 ? (
+                                      <td rowSpan={c.diseases.length} style={{ verticalAlign: 'top', paddingTop: 10, borderRight: '1px solid #E5EAF0' }}>
+                                        <strong>{c.country_name}</strong>
+                                        <span className="mono ml-1" style={{ color: '#6B7C93', fontSize: 11 }}>{c.iso3}</span>
+                                      </td>
+                                    ) : null}
+                                    <td>
+                                      <span style={{
+                                        display: 'inline-block',
+                                        width: 8, height: 8,
+                                        borderRadius: '50%',
+                                        background: DISEASE_COLORS[d.disease] || '#6B7C93',
+                                        marginRight: 6,
+                                      }} />
+                                      {d.disease}
+                                    </td>
+                                    {i === 0 ? (
+                                      <td rowSpan={c.diseases.length} style={{ verticalAlign: 'top', paddingTop: 10, borderRight: '1px solid #E5EAF0' }}>
+                                        <span className="priority-badge" style={{ color: PRIORITY_COLOR[c.priority], borderColor: PRIORITY_COLOR[c.priority] + '55' }}>
+                                          {PRIORITY_LABEL[c.priority]}
+                                        </span>
+                                      </td>
+                                    ) : null}
+                                    <td className="num">{d.cases.toLocaleString()}</td>
+                                    <td className="num">{d.deaths.toLocaleString()}</td>
+                                    <td className={`num ${d.avgCFR > 10 ? 'text-danger' : d.avgCFR > 5 ? 'text-warn' : ''}`}>
+                                      {d.avgCFR.toFixed(2)}%
+                                    </td>
+                                  </tr>
+                                ))}
+
+                                {/* Country total row */}
+                                <tr key={`dtotal-${c.iso3}`} style={{ background: '#F8FAFC', fontWeight: 600, borderTop: '1px solid #D1DBE8' }}>
+                                  <td style={{ paddingLeft: 20, color: '#1A2B4A' }}>{c.country_name} Total</td>
+                                  <td></td>
+                                  <td></td>
+                                  <td className="num">{c.totalCases.toLocaleString()}</td>
+                                  <td className="num">{c.diseases.reduce((s, d) => s + d.deaths, 0).toLocaleString()}</td>
+                                  <td className="num">
+                                    {c.diseases.length
+                                      ? `${(c.diseases.reduce((s, d) => s + d.avgCFR, 0) / c.diseases.length).toFixed(2)}%`
+                                      : '—'}
+                                  </td>
+                                </tr>
+                              </>
+                            ))}
+
+                            {/* Sub-region disease subtotal */}
+                            <tr
+                              key={`dsub-${subregion}`}
+                              style={{ background: REGION_COLORS[subregion] + '10', fontWeight: 700, borderTop: `2px solid ${REGION_COLORS[subregion]}` }}
+                            >
+                              <td style={{ color: REGION_COLORS[subregion], paddingLeft: 20 }}>{subregion} Subtotal</td>
+                              <td></td>
+                              <td></td>
+                              <td className="num">{rows.reduce((s, c) => s + c.totalCases, 0).toLocaleString()}</td>
+                              <td className="num">{rows.reduce((s, c) => s + c.diseases.reduce((sd, d) => sd + d.deaths, 0), 0).toLocaleString()}</td>
+                              <td className="num">—</td>
+                            </tr>
+                          </>
+                        ))}
+
+                        {/* AFRO Grand Total */}
+                        {filterSubregion === 'All' && (
+                          <tr style={{ background: '#1A2B4A', color: '#fff', fontWeight: 700 }}>
+                            <td style={{ color: '#fff' }}>AFRO TOTAL</td>
+                            <td></td>
+                            <td></td>
+                            <td className="num">{afroTotals.totalCases.toLocaleString()}</td>
+                            <td className="num">{afroTotals.totalDeaths.toLocaleString()}</td>
+                            <td className="num">{afroTotals.cfr !== '—' ? `${afroTotals.cfr}%` : '—'}</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </section>
           )}
