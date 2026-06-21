@@ -39,7 +39,7 @@ export default function DiseaseBarChart({ data = [] }) {
       <BarChart
         data={sorted}
         layout="vertical"
-        margin={{ top: 4, right: 24, left: 140, bottom: 4 }}
+        margin={{ top: 4, right: 24, left: 2, bottom: 4 }}
       >
         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
         <XAxis type="number" tickFormatter={fmt} tick={{ fontSize: 11, fill: '#6B7C93' }} />
@@ -47,7 +47,7 @@ export default function DiseaseBarChart({ data = [] }) {
           type="category"
           dataKey="disease"
           tick={{ fontSize: 11, fill: '#1A2B4A' }}
-          width={135}
+          width={160}
         />
         <Tooltip content={<CustomTooltip />} />
         <Bar dataKey="cases_reported" name="Cases" radius={[0, 4, 4, 0]}>
