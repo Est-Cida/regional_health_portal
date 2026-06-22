@@ -177,7 +177,7 @@ export default function OutbreaksDashboard() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={Math.max(180, byDisease.length * 38 + 16)}>
-              <BarChart data={byDisease} layout="vertical" margin={{ top: 4, right: 20, left: 140, bottom: 4 }}>
+              <BarChart data={byDisease} layout="vertical" margin={{ top: 4, right: 10, left: 2, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
                 <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7C93' }} />
                 <YAxis type="category" dataKey="disease" tick={{ fontSize: 11, fill: '#1A2B4A' }} width={135} />
