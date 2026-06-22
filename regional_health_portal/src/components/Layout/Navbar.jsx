@@ -36,7 +36,7 @@ export default function Navbar() {
             <line x1="3" y1="18" x2="21" y2="18"/>
           </svg>
         </button>
-        <span className="navbar-title">Regional Health Portal</span>
+        <span className="navbar-title">Regional Health Portal - RHP</span>
       </div>
 
       <div className="navbar-right">
