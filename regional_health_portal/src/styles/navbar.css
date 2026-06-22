@@ -1,0 +1,93 @@
+/* ── Navbar ───────────────────────────────────────────────────────────────── */
+
+.navbar {
+  height: var(--navbar-h);
+  background: white;
+  border-bottom: 1px solid var(--who-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: var(--shadow-sm);
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.navbar-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--who-dark);
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.navbar-user {
+  font-size: 13.5px;
+  color: var(--who-muted);
+}
+
+/* Hamburger — hidden on desktop, shown on mobile via responsive.css */
+.navbar-hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: none;
+  border-radius: var(--radius);
+  color: var(--who-dark);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+.navbar-hamburger:hover { background: #F0F4F8; }
+
+/* ── Role badges ──────────────────────────────────────────────────────────── */
+
+.role-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.badge-country  { background: var(--who-blue-light); color: var(--who-blue); }
+.badge-regional { background: #F5F0FF; color: var(--purple); }
+.badge-super    { background: #FFF0F0; color: var(--danger); }
+
+/* ── Logout ───────────────────────────────────────────────────────────────── */
+
+.btn-logout {
+  background: none;
+  border: 1px solid var(--who-border);
+  border-radius: var(--radius);
+  padding: 5px 14px;
+  font-size: 12.5px;
+  color: var(--who-muted);
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+
+/* Mobile sidebar overlay backdrop */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .45);
+  z-index: 199;
+  cursor: pointer;
+}

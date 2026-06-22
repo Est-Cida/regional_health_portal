@@ -1,0 +1,45 @@
+/* ── CSS Variables, Reset, Base ──────────────────────────────────────────── */
+
+:root {
+  --who-blue:       #0071BC;
+  --who-blue-dark:  #005A94;
+  --who-blue-light: #EBF5FF;
+  --who-dark:       #1A2B4A;
+  --who-muted:      #6B7C93;
+  --who-border:     #D4DCE6;
+
+  --danger:   #C00000;
+  --warning:  #D97706;
+  --success:  #059669;
+  --purple:   #7B2D8B;
+  --teal:     #0D9488;
+
+  --bg:       #F0F4F8;
+  --card-bg:  #FFFFFF;
+
+  --sidebar-w:    240px;
+  --navbar-h:     60px;
+  --radius:       8px;
+  --radius-lg:    12px;
+  --shadow-sm:    0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:    0 4px 12px rgba(0,0,0,.10);
+
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--who-dark);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  min-height: 100vh;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #C5CFD9; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9BAAB8; }

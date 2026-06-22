@@ -1,0 +1,291 @@
+/* ── Regional Map ─────────────────────────────────────────────────────────── */
+
+/* Full-bleed map card — escapes page-main padding, spans edge-to-edge */
+.map-card-full {
+  margin: 0 -24px -24px;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  border-radius: 0 !important;
+}
+
+.regional-map-wrap { position: relative; }
+
+/* ── Metric Toggle ────────────────────────────────────────────────────────── */
+
+.map-metric-toggle {
+  display: flex;
+  gap: 4px;
+  background: #F1F5F9;
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.map-metric-btn {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: var(--who-muted);
+  transition: background .15s, color .15s;
+  font-family: inherit;
+}
+
+.map-metric-btn.active {
+  background: #fff;
+  color: var(--who-blue);
+  box-shadow: 0 1px 3px rgba(0,0,0,.12);
+}
+
+.map-metric-btn:not(.active):hover { color: var(--who-dark); }
+
+/* ── Leaflet Overrides ────────────────────────────────────────────────────── */
+
+.leaflet-container { font-family: inherit; }
+.leaflet-popup-content-wrapper {
+  border-radius: 10px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.16) !important;
+  padding: 0 !important;
+}
+.leaflet-popup-content     { margin: 0 !important; }
+.leaflet-popup-tip-container { display: none; }
+
+.leaflet-tooltip {
+  border: none !important;
+  border-radius: 7px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,.14) !important;
+  padding: 6px 10px !important;
+  background: var(--who-dark) !important;
+  color: #fff !important;
+  font-size: 12px !important;
+}
+.leaflet-tooltip::before { display: none !important; }
+
+/* ── Map Popup ────────────────────────────────────────────────────────────── */
+
+.map-popup        { padding: 14px 16px; min-width: 180px; }
+.map-popup-title  { font-size: 14px; font-weight: 700; color: var(--who-dark); margin-bottom: 2px; }
+.map-popup-iso    { font-size: 11px; color: var(--who-muted); margin-bottom: 10px; }
+.map-popup-divider { height: 1px; background: #E5EAF0; margin-bottom: 10px; }
+
+.map-popup-grid {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 5px 16px;
+  font-size: 12px;
+  align-items: center;
+}
+.map-popup-grid span   { color: var(--who-muted); }
+.map-popup-grid strong { text-align: right; color: var(--who-dark); }
+
+/* Map tooltip text */
+.map-tooltip          { display: flex; flex-direction: column; gap: 2px; }
+.map-tooltip strong   { font-size: 13px; }
+.map-tooltip span     { font-size: 11px; opacity: .85; }
+.map-tt-priority      { color: #FCA5A5; }
+
+/* ── Map Legend ───────────────────────────────────────────────────────────── */
+
+.map-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-top: 1px solid #E5EAF0;
+  background: #FAFBFC;
+  border-radius: 0 0 8px 8px;
+  font-size: 11px;
+  color: var(--who-muted);
+}
+
+.map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.map-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.map-legend-note {
+  margin-left: auto;
+  font-style: italic;
+  font-size: 10px;
+}
+
+/* ── Map Hover Panel ──────────────────────────────────────────────────────── */
+
+.mhp {
+  position: fixed;
+  z-index: 1200;
+  width: 288px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.20), 0 2px 8px rgba(0,0,0,.10);
+  border: 1px solid var(--who-border);
+  pointer-events: none;
+  animation: fadeIn .12s ease;
+  overflow: hidden;
+}
+
+.mhp-header {
+  background: var(--who-dark);
+  color: #fff;
+  padding: 12px 14px 10px;
+}
+.mhp-header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.mhp-name { font-size: 14px; font-weight: 700; line-height: 1.2; }
+.mhp-iso  {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  background: rgba(255,255,255,.15);
+  border-radius: 4px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.mhp-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,.65);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mhp-priority-badge {
+  background: rgba(192,0,0,.55);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.mhp-section {
+  padding: 9px 14px;
+  border-bottom: 1px solid #F0F4F8;
+}
+.mhp-section:last-child { border-bottom: none; }
+
+.mhp-section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mhp-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--who-muted);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mhp-stat-row {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--who-muted);
+  margin-bottom: 7px;
+}
+.mhp-stat-row strong { color: var(--who-dark); }
+
+.mhp-disease-row   { margin-bottom: 5px; }
+.mhp-disease-label {
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+.mhp-disease-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 5px;
+}
+.mhp-disease-name {
+  flex: 1;
+  color: var(--who-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mhp-disease-count {
+  font-size: 10.5px;
+  color: var(--who-muted);
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+.mhp-bar-track {
+  height: 5px;
+  background: #E5EAF0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.mhp-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .2s ease;
+}
+
+.mhp-outbreak-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warning);
+}
+
+.mhp-funding-total {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--who-dark);
+}
+.mhp-funding-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 5px 0;
+  background: #E5EAF0;
+}
+.mhp-funding-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--who-muted);
+}
+.mhp-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.mhp-capacity-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 12px;
+  font-size: 11.5px;
+  align-items: center;
+}
+.mhp-capacity-grid span   { color: var(--who-muted); }
+.mhp-capacity-grid strong { color: var(--who-dark); text-align: right; }

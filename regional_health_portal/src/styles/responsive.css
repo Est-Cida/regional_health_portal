@@ -1,0 +1,122 @@
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
+/* ── Tablet (≤ 1024px) ────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .page-main { padding: 20px; }
+  .kpi-grid-3 { grid-template-columns: repeat(2, 1fr); }
+  .page-header { flex-direction: column; align-items: flex-start; }
+  .page-header-controls { flex-wrap: wrap; }
+  .country-subheader-controls { flex-wrap: wrap; gap: 8px; }
+}
+
+/* ── Mobile (< 768px) ─────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+
+  /* Show hamburger */
+  .navbar-hamburger { display: flex; }
+
+  /* Sidebar becomes slide-in overlay */
+  .page-wrapper { margin-left: 0 !important; }
+
+  .sidebar {
+    transform: translateX(-100%);
+    width: 240px !important;
+    z-index: 200;
+    transition: transform .25s cubic-bezier(.4, 0, .2, 1);
+  }
+
+  body.sidebar-open .sidebar          { transform: translateX(0); }
+  body.sidebar-open .sidebar-backdrop { display: block; }
+
+  /* Reduced page padding */
+  .page-main    { padding: 14px; }
+  .map-card-full { margin: 0 -14px -14px; }
+
+  /* Navbar */
+  .navbar      { padding: 0 14px; }
+  .navbar-user { display: none; }
+
+  /* Page header */
+  .page-header          { flex-direction: column; gap: 12px; }
+  .page-header-controls { flex-wrap: wrap; width: 100%; gap: 8px; }
+  .page-title           { font-size: 19px; }
+
+  /* KPI grids — 2 columns on phones */
+  .kpi-grid   { grid-template-columns: repeat(2, 1fr) !important; }
+  .kpi-grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
+  .kpi-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  .kpi-value  { font-size: 22px; }
+  .kpi-card   { padding: 14px 14px 10px; }
+
+  /* Charts — single column */
+  .charts-grid { grid-template-columns: 1fr !important; }
+
+  /* Select controls */
+  .select-control { min-width: 0; width: 100%; }
+  .select-sm      { min-width: 0; }
+
+  /* Country subheader */
+  .country-subheader          { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .country-subheader-controls { flex-wrap: wrap; gap: 8px; width: 100%; }
+
+  /* Year tabs — smaller */
+  .year-tab { padding: 4px 9px; font-size: 11.5px; }
+
+  /* MSD dropdown stays in viewport */
+  .msd-panel    { right: auto; left: 0; max-width: calc(100vw - 28px); }
+  .msd-trigger  { min-width: 0; }
+
+  /* Multi-select control group fills width */
+  .control-group              { width: 100%; }
+  .control-group .msd-trigger { width: 100%; }
+  .control-group .msd-wrap    { width: 100%; }
+
+  /* Login — hide hero, full-width form */
+  .login-hero       { display: none; }
+  .login-form-panel { padding: 32px 20px; }
+
+  /* Modals — bottom sheet */
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal {
+    border-radius: 16px 16px 0 0;
+    max-height: 90vh;
+    max-width: 100%;
+  }
+  .modal-fields-grid { grid-template-columns: 1fr; }
+
+  /* Card header wraps */
+  .card-header  { flex-direction: column; align-items: flex-start; }
+  .card-filters { flex-wrap: wrap; }
+
+  /* Section heading */
+  .section-heading { font-size: 14px; }
+
+  /* Page tab bar — scrollable */
+  .page-tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .page-tab     { white-space: nowrap; flex-shrink: 0; padding: 8px 14px 9px; }
+
+  /* Quick-nav */
+  .quicknav-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* ── Small phones (< 480px) ───────────────────────────────────────────────── */
+@media (max-width: 479px) {
+  .page-main    { padding: 10px; }
+  .map-card-full { margin: 0 -10px -10px; }
+  .navbar       { padding: 0 10px; }
+
+  /* Single column for everything */
+  .kpi-grid      { grid-template-columns: 1fr !important; }
+  .kpi-grid-3    { grid-template-columns: 1fr !important; }
+  .kpi-grid-4    { grid-template-columns: 1fr !important; }
+  .quicknav-grid { grid-template-columns: 1fr !important; }
+
+  .kpi-value { font-size: 26px; }
+
+  /* Full-width year tabs */
+  .year-tabs { width: 100%; justify-content: center; }
+  .year-tab  { flex: 1; text-align: center; }
+
+  /* Role badge hidden on tiny screens */
+  .role-badge { display: none; }
+}
