@@ -175,7 +175,7 @@ export default function RegionalDashboard() {
 
           {/* Map */}
           <section className="section">
-            <div className="card">
+            <div className="card map-card-full">
               <div className="card-header">
                 <div>
                   <h2 className="card-title">Geographic Distribution</h2>

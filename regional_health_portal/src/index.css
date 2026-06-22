@@ -55,8 +55,8 @@ body {
 .page-main {
   flex: 1;
   padding: 24px;
-  max-width: 1400px;
   width: 100%;
+  min-width: 0;
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */
@@ -1472,6 +1472,15 @@ body {
 
 /* ── Regional Map ────────────────────────────────────────────────────────── */
 
+/* Full-bleed map card — escapes page-main padding, spans edge-to-edge */
+.map-card-full {
+  margin: 0 -24px -24px;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  border-radius: 0 !important;
+}
+
 .regional-map-wrap { position: relative; }
 
 /* Metric toggle buttons in card header */
@@ -1726,6 +1735,7 @@ body {
 
   /* Reduced page padding */
   .page-main { padding: 14px; }
+  .map-card-full { margin: 0 -14px -14px; }
 
   /* Navbar */
   .navbar { padding: 0 14px; }
@@ -1797,6 +1807,7 @@ body {
 /* ── Small phones (< 480px) ───────────────────────────────────────── */
 @media (max-width: 479px) {
   .page-main { padding: 10px; }
+  .map-card-full { margin: 0 -10px -10px; }
   .navbar { padding: 0 10px; }
 
   /* Single column for everything */
