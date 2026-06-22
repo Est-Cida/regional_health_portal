@@ -9,13 +9,17 @@ import {
   getDiseaseList,
   getRawSurveillance,
   getRawOutbreaks,
+  getRawWorkforce,
+  getRawFunding,
   SUBREGIONS,
+  YEARS,
 } from '../data/dataService'
 
-const YEARS = [2021, 2022, 2023, 2024, 2025]
 const ALL_DISEASES     = getDiseaseList()
 const RAW_SURVEILLANCE = getRawSurveillance()
 const RAW_OUTBREAKS    = getRawOutbreaks()
+const RAW_WORKFORCE    = getRawWorkforce()
+const RAW_FUNDING      = getRawFunding()
 
 const MAP_METRICS = [
   { key: 'totalCases',    label: 'Cases'     },
@@ -92,6 +96,46 @@ export default function RegionalDashboard() {
   const diseaseSubtitle = allDiseasesSelected
     ? 'All countries, all diseases'
     : `All countries, ${selectedDiseases.length} disease${selectedDiseases.length !== 1 ? 's' : ''}`
+
+  // Per-country detail data for the map hover panel
+  const detailData = useMemo(() => {
+    const activeSubs = (allSubregionsSelected || !selectedSubregions.length)
+      ? availableSubregions : selectedSubregions
+    const countries = activeSubs.flatMap(sub => getCountriesBySubregion(sub))
+    const years = selectedYear === 'all' ? YEARS : [Number(selectedYear)]
+
+    const result = {}
+    countries.forEach(c => {
+      const iso = c.iso_3_code
+
+      // Disease case breakdown (top 5)
+      const survRows = RAW_SURVEILLANCE.filter(s => s.iso_3_code === iso && years.includes(s.year))
+      const byDisease = {}
+      survRows.forEach(s => {
+        byDisease[s.disease] = (byDisease[s.disease] || 0) + (s.cases_reported || 0)
+      })
+      const diseases = Object.entries(byDisease)
+        .map(([disease, cases]) => ({ disease, cases }))
+        .sort((a, b) => b.cases - a.cases)
+        .slice(0, 5)
+
+      // Funding
+      const fundRows = RAW_FUNDING.filter(f => f.iso_3_code === iso && years.includes(f.year))
+      const totalFunding    = fundRows.reduce((s, f) => s + (f.total_health_funding_usd    || 0), 0)
+      const domesticFunding = fundRows.reduce((s, f) => s + (f.domestic_funding_usd        || 0), 0)
+      const externalFunding = fundRows.reduce((s, f) => s + (f.external_funding_usd        || 0), 0)
+
+      // Workforce capacity
+      const wfRows = RAW_WORKFORCE.filter(w => w.iso_3_code === iso && years.includes(w.year))
+      const n = Math.max(wfRows.length, 1)
+      const epidemiologists = Math.round(wfRows.reduce((s, w) => s + (w.epidemiologists_total    || 0), 0) / n)
+      const feltp           = Math.round(wfRows.reduce((s, w) => s + (w.feltp_trained_total       || 0), 0) / n)
+      const labTech         = Math.round(wfRows.reduce((s, w) => s + (w.lab_technicians_total     || 0), 0) / n)
+
+      result[iso] = { diseases, totalFunding, domesticFunding, externalFunding, epidemiologists, feltp, labTech }
+    })
+    return result
+  }, [selectedSubregions, allSubregionsSelected, selectedYear, availableSubregions])
 
   // Pass the first selected subregion to map for centering; fall back to first available
   const mapSubregion = selectedSubregions[0] ?? availableSubregions[0]
@@ -198,6 +242,7 @@ export default function RegionalDashboard() {
 
               <RegionalMap
                 overview={overview}
+                detailData={detailData}
                 metric={mapMetric}
                 year={selectedYear}
                 subregion={mapSubregion}

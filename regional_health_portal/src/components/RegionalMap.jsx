@@ -1,9 +1,9 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-// ── Module-level boundary cache (fetched once per session) ────────────────────
+// ── Module-level boundary cache ───────────────────────────────────────────────
 let _boundaryCache = null
 const API = 'http://localhost:8000'
 
@@ -33,6 +33,16 @@ function choroplethColor(value, max) {
   return '#059669'
 }
 
+const DISEASE_COLORS = {
+  'Cholera':                  '#0071BC',
+  'Measles':                  '#F7941D',
+  'Meningitis':               '#7B2D8B',
+  'Yellow fever':             '#D4A017',
+  'Lassa fever':              '#C00000',
+  'Viral haemorrhagic fever': '#8B0000',
+  'Polio (cVDPV)':            '#059669',
+}
+
 const LEGEND_ITEMS = [
   { color: '#059669', label: 'Low'      },
   { color: '#0071BC', label: 'Moderate' },
@@ -41,24 +51,153 @@ const LEGEND_ITEMS = [
   { color: '#CBD5E1', label: 'No data'  },
 ]
 
-// ── Auto-fit to the filtered features ─────────────────────────────────────────
+// ── Formatting ────────────────────────────────────────────────────────────────
+
+function fmtMoney(n) {
+  if (!n) return '$0'
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000)     return `$${(n / 1_000).toFixed(0)}K`
+  return `$${Math.round(n)}`
+}
+
+// ── Panel positioning helper ──────────────────────────────────────────────────
+
+function panelStyle(x, y) {
+  const W = 288
+  const left = x + W + 24 < window.innerWidth ? x + 18 : x - W - 18
+  const top  = Math.max(10, Math.min(y - 30, window.innerHeight - 480))
+  return { left, top }
+}
+
+// ── Hover panel ───────────────────────────────────────────────────────────────
+
+function HoverPanel({ hover }) {
+  if (!hover) return null
+  const { country, detail, pos } = hover
+  const { left, top } = panelStyle(pos.x, pos.y)
+
+  if (!country) {
+    return (
+      <div className="mhp" style={{ left, top }}>
+        <div className="mhp-header">
+          <div className="mhp-name">{hover.name}</div>
+          <div className="mhp-sub" style={{ opacity: .6 }}>Not in current filter</div>
+        </div>
+      </div>
+    )
+  }
+
+  const diseases     = detail?.diseases || []
+  const maxCases     = diseases[0]?.cases || 1
+  const totalFunding = detail?.totalFunding || 0
+  const domPct       = totalFunding ? Math.round((detail.domesticFunding / totalFunding) * 100) : 0
+  const extPct       = 100 - domPct
+
+  return (
+    <div className="mhp" style={{ left, top }}>
+
+      {/* ── Header ── */}
+      <div className="mhp-header">
+        <div className="mhp-header-row">
+          <span className="mhp-name">{country.country_name}</span>
+          <span className="mhp-iso">{hover.iso}</span>
+        </div>
+        <div className="mhp-sub">
+          {country.subregion} Africa
+          {country.priority === 1 && <span className="mhp-priority-badge">⚑ High Priority</span>}
+        </div>
+      </div>
+
+      {/* ── Disease Surveillance ── */}
+      <div className="mhp-section">
+        <div className="mhp-section-title">Disease Surveillance</div>
+        <div className="mhp-stat-row">
+          <span>Cases <strong>{country.totalCases.toLocaleString()}</strong></span>
+          <span>Deaths <strong>{country.totalDeaths.toLocaleString()}</strong></span>
+          <span>CFR <strong>{country.avgCFR.toFixed(1)}%</strong></span>
+        </div>
+        {diseases.slice(0, 5).map(({ disease, cases }) => (
+          <div key={disease} className="mhp-disease-row">
+            <div className="mhp-disease-label">
+              <span
+                className="mhp-disease-dot"
+                style={{ background: DISEASE_COLORS[disease] || '#94A3B8' }}
+              />
+              <span className="mhp-disease-name">{disease}</span>
+              <span className="mhp-disease-count">{cases.toLocaleString()}</span>
+            </div>
+            <div className="mhp-bar-track">
+              <div
+                className="mhp-bar-fill"
+                style={{
+                  width: `${Math.round((cases / maxCases) * 100)}%`,
+                  background: DISEASE_COLORS[disease] || '#94A3B8',
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Outbreaks ── */}
+      <div className="mhp-section mhp-section-row">
+        <span className="mhp-section-title">Outbreaks</span>
+        <span className="mhp-outbreak-count">
+          {country.outbreakCount > 0
+            ? `⚠ ${country.outbreakCount} event${country.outbreakCount !== 1 ? 's' : ''}`
+            : '— none recorded'}
+        </span>
+      </div>
+
+      {/* ── Funding ── */}
+      {totalFunding > 0 && (
+        <div className="mhp-section">
+          <div className="mhp-section-title">
+            Funding
+            <span className="mhp-funding-total">{fmtMoney(totalFunding)} total</span>
+          </div>
+          <div className="mhp-funding-bar">
+            <div style={{ width: `${domPct}%`, background: '#0071BC', borderRadius: '3px 0 0 3px' }} />
+            <div style={{ width: `${extPct}%`, background: '#D97706', borderRadius: '0 3px 3px 0' }} />
+          </div>
+          <div className="mhp-funding-labels">
+            <span><span className="mhp-dot" style={{ background: '#0071BC' }} />{domPct}% domestic</span>
+            <span><span className="mhp-dot" style={{ background: '#D97706' }} />{extPct}% external</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Health Capacity ── */}
+      {detail && (detail.epidemiologists > 0 || detail.labTech > 0) && (
+        <div className="mhp-section">
+          <div className="mhp-section-title">Health Capacity</div>
+          <div className="mhp-capacity-grid">
+            <span>Epidemiologists</span>  <strong>{(detail.epidemiologists || 0).toLocaleString()}</strong>
+            <span>FELTP Trained</span>    <strong>{(detail.feltp          || 0).toLocaleString()}</strong>
+            <span>Lab Technicians</span>  <strong>{(detail.labTech        || 0).toLocaleString()}</strong>
+          </div>
+        </div>
+      )}
+
+    </div>
+  )
+}
+
+// ── Auto-fit ──────────────────────────────────────────────────────────────────
 
 function FitBounds({ geojsonData }) {
   const map = useMap()
   useEffect(() => {
     if (!geojsonData?.features?.length) return
     try {
-      const layer = L.geoJSON(geojsonData)
-      const bounds = layer.getBounds()
-      if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [24, 24], maxZoom: 7 })
-      }
-    } catch (e) { /* ignore */ }
+      const bounds = L.geoJSON(geojsonData).getBounds()
+      if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 7 })
+    } catch { /* ignore */ }
   }, [map, geojsonData])
   return null
 }
 
-// ── Metric config ──────────────────────────────────────────────────────────────
+// ── Metric config ─────────────────────────────────────────────────────────────
 
 const METRIC_CFG = {
   totalCases:    { label: 'Total Cases',  fmt: v => v.toLocaleString() },
@@ -66,93 +205,112 @@ const METRIC_CFG = {
   outbreakCount: { label: 'Outbreaks',    fmt: v => String(v)          },
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+// ── Main component ────────────────────────────────────────────────────────────
 
-export default function RegionalMap({ overview, metric = 'totalCases', year, subregion }) {
+export default function RegionalMap({ overview, detailData = {}, metric = 'totalCases', year, subregion }) {
   const boundaries = useBoundaries()
   const cfg = METRIC_CFG[metric] || METRIC_CFG.totalCases
 
-  // Build iso3 → country data lookup from the overview prop
+  const [hoverIso, setHoverIso]   = useState(null)
+  const [hoverPos, setHoverPos]   = useState({ x: 0, y: 0 })
+  const panelRef                  = useRef(null)
+
+  // Lookup maps — stable references via useMemo
   const overviewMap = useMemo(() => {
     const m = {}
     overview.forEach(c => { m[c.iso3] = c })
     return m
   }, [overview])
 
-  const values = overview.map(c => c[metric] || 0)
-  const max    = Math.max(...values, 1)
-
-  // Subset of boundaries matching the selected sub-region countries
+  const values      = overview.map(c => c[metric] || 0)
+  const max         = Math.max(...values, 1)
   const visibleIsos = useMemo(() => new Set(overview.map(c => c.iso3)), [overview])
 
-  // Key forces GeoJSON layer to re-mount when metric or values change
+  // Keep refs always current so stable callbacks can read latest values
+  const stateRef = useRef({})
+  stateRef.current = { overviewMap, detailData, metric, max, visibleIsos, cfg, year }
+
+  // Filtered features for FitBounds
+  const visibleFeatures = useMemo(
+    () => boundaries
+      ? { features: boundaries.features.filter(f => visibleIsos.has(f.properties.iso3)) }
+      : null,
+    [boundaries, visibleIsos]
+  )
+
+  // GeoJSON key — forces re-mount when metric or data changes
   const geoKey = useMemo(
     () => `${metric}|${overview.map(c => `${c.iso3}:${c[metric] ?? 0}`).join(',')}`,
     [metric, overview]
   )
 
-  // GeoJSON style callback
-  function styleFeature(feature) {
-    const iso  = feature.properties.iso3
-    const data = overviewMap[iso]
-    const val  = data ? (data[metric] || 0) : null
+  // Stable style callback (reads latest values from stateRef)
+  const styleFeature = useCallback((feature) => {
+    const { overviewMap, metric, max, visibleIsos } = stateRef.current
+    const iso    = feature.properties.iso3
+    const data   = overviewMap[iso]
+    const val    = data ? (data[metric] || 0) : 0
     const inView = visibleIsos.has(iso)
-
     return {
       fillColor:   inView ? choroplethColor(val, max) : '#E2E8F0',
       fillOpacity: inView ? 0.78 : 0.35,
       color:       inView ? '#fff' : '#C4CDD9',
       weight:      inView ? 1.2 : 0.6,
     }
-  }
+  }, []) // stable — reads stateRef
 
-  // Tooltip + popup per feature
-  function onEachFeature(feature, layer) {
-    const iso  = feature.properties.iso3
-    const data = overviewMap[iso]
-
-    if (!data) {
-      layer.bindTooltip(
-        `<div class="map-tooltip"><strong>${feature.properties.name}</strong><span style="opacity:.6">Not in current filter</span></div>`,
-        { sticky: true }
-      )
-      return
-    }
-
-    const val = data[metric] || 0
-
-    layer.bindTooltip(
-      `<div class="map-tooltip">
-        <strong>${data.country_name}</strong>
-        <span>${cfg.label}: <b>${cfg.fmt(val)}</b></span>
-        ${data.priority === 1 ? '<span class="map-tt-priority">⚑ High Priority</span>' : ''}
-      </div>`,
-      { sticky: true }
-    )
-
-    layer.bindPopup(
-      `<div class="map-popup">
-        <div class="map-popup-title">${data.country_name}</div>
-        <div class="map-popup-iso">${iso} · ${data.subregion} Africa · ${year}</div>
-        <div class="map-popup-divider"></div>
-        <div class="map-popup-grid">
-          <span>Cases</span>     <strong>${data.totalCases.toLocaleString()}</strong>
-          <span>Deaths</span>    <strong>${data.totalDeaths.toLocaleString()}</strong>
-          <span>Avg CFR</span>   <strong>${data.avgCFR.toFixed(2)}%</strong>
-          <span>Outbreaks</span> <strong>${data.outbreakCount}</strong>
-          <span>Priority</span>  <strong style="color:${
-            data.priority === 1 ? '#C00000' : data.priority === 2 ? '#D97706' : '#059669'
-          }">${data.priority === 1 ? 'High' : data.priority === 2 ? 'Medium' : 'Standard'}</strong>
-        </div>
-      </div>`,
-      { maxWidth: 260 }
-    )
+  // Stable event callback
+  const onEachFeature = useCallback((feature, layer) => {
+    const iso = feature.properties.iso3
 
     layer.on({
-      mouseover(e) { e.target.setStyle({ fillOpacity: 0.92, weight: 2.2, color: '#1A2B4A' }) },
-      mouseout(e)  { e.target.setStyle(styleFeature(feature)) },
+      mouseover(e) {
+        const { overviewMap, detailData, year, cfg } = stateRef.current
+        const country = overviewMap[iso]
+        const detail  = detailData[iso]
+        setHoverIso(iso)
+        setHoverPos({ x: e.originalEvent.clientX, y: e.originalEvent.clientY })
+        // Show tooltip text
+        const val = country ? (country[stateRef.current.metric] || 0) : 0
+        layer.bindTooltip(
+          country
+            ? `<div class="map-tooltip"><strong>${country.country_name}</strong><span>${cfg.label}: <b>${cfg.fmt(val)}</b></span>${country.priority === 1 ? '<span class="map-tt-priority">⚑ High Priority</span>' : ''}</div>`
+            : `<div class="map-tooltip"><strong>${feature.properties.name}</strong><span style="opacity:.6">Not in filter</span></div>`,
+          { sticky: true, opacity: 0.96 }
+        ).openTooltip()
+        e.target.setStyle({ fillOpacity: 0.92, weight: 2.2, color: '#1A2B4A' })
+      },
+      mousemove(e) {
+        setHoverPos({ x: e.originalEvent.clientX, y: e.originalEvent.clientY })
+      },
+      mouseout(e) {
+        setHoverIso(null)
+        layer.closeTooltip()
+        const { overviewMap, metric, max, visibleIsos } = stateRef.current
+        const data   = overviewMap[iso]
+        const val    = data ? (data[metric] || 0) : 0
+        const inView = visibleIsos.has(iso)
+        e.target.setStyle({
+          fillColor:   inView ? choroplethColor(val, max) : '#E2E8F0',
+          fillOpacity: inView ? 0.78 : 0.35,
+          color:       inView ? '#fff' : '#C4CDD9',
+          weight:      inView ? 1.2 : 0.6,
+        })
+      },
     })
-  }
+  }, []) // stable — reads stateRef
+
+  // Build hover prop for the panel
+  const hoverProp = useMemo(() => {
+    if (!hoverIso) return null
+    return {
+      iso:     hoverIso,
+      name:    overviewMap[hoverIso]?.country_name || hoverIso,
+      country: overviewMap[hoverIso] || null,
+      detail:  detailData[hoverIso]  || null,
+      pos:     hoverPos,
+    }
+  }, [hoverIso, hoverPos, overviewMap, detailData])
 
   return (
     <div className="regional-map-wrap">
@@ -178,11 +336,10 @@ export default function RegionalMap({ overview, metric = 'totalCases', year, sub
               style={styleFeature}
               onEachFeature={onEachFeature}
             />
-            <FitBounds geojsonData={{ features: boundaries.features.filter(f => visibleIsos.has(f.properties.iso3)) }} />
+            {visibleFeatures && <FitBounds geojsonData={visibleFeatures} />}
           </>
         )}
 
-        {/* Label tile layer on top so country names render over the polygons */}
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
           subdomains="abcd"
@@ -205,6 +362,11 @@ export default function RegionalMap({ overview, metric = 'totalCases', year, sub
           </span>
         )}
         <div className="map-legend-note">Colour intensity ∝ {cfg.label.toLowerCase()}</div>
+      </div>
+
+      {/* Hover panel — rendered outside Leaflet so it can use React state */}
+      <div ref={panelRef}>
+        <HoverPanel hover={hoverProp} />
       </div>
     </div>
   )
