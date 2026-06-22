@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Layout/Navbar'
 import Sidebar from '../components/Layout/Sidebar'
@@ -41,6 +41,24 @@ export default function RegionalDashboard() {
   const allDiseasesSelected   = selectedDiseases.length   === ALL_DISEASES.length
   const yearLabel = selectedYear === 'all' ? 'All Years' : selectedYear
 
+  // Countries available under current sub-region selection
+  const availableCountries = useMemo(() => {
+    const activeSubs = (allSubregionsSelected || !selectedSubregions.length)
+      ? availableSubregions : selectedSubregions
+    return activeSubs.flatMap(sub => getCountriesBySubregion(sub))
+  }, [selectedSubregions, allSubregionsSelected, availableSubregions])
+
+  const [selectedCountries, setSelectedCountries] = useState(
+    () => availableCountries.map(c => c.iso_3_code)
+  )
+
+  // Reset country filter whenever the available pool changes (sub-region switch)
+  useEffect(() => {
+    setSelectedCountries(availableCountries.map(c => c.iso_3_code))
+  }, [availableCountries])
+
+  const allCountriesSelected = selectedCountries.length === availableCountries.length
+
   // Title reflects current selection
   const regionLabel = useMemo(() => {
     if (allSubregionsSelected || !selectedSubregions.length) return 'WHO AFRO'
@@ -49,11 +67,10 @@ export default function RegionalDashboard() {
   }, [selectedSubregions, allSubregionsSelected])
 
   const overview = useMemo(() => {
-    const activeSubs = (allSubregionsSelected || !selectedSubregions.length)
-      ? availableSubregions
-      : selectedSubregions
-    const countries = activeSubs.flatMap(sub => getCountriesBySubregion(sub))
     const years = selectedYear === 'all' ? YEARS : [Number(selectedYear)]
+    const countries = allCountriesSelected
+      ? availableCountries
+      : availableCountries.filter(c => selectedCountries.includes(c.iso_3_code))
 
     return countries.map(c => {
       const iso3 = c.iso_3_code
@@ -87,25 +104,26 @@ export default function RegionalDashboard() {
         outbreakCount: obsRows.length,
       }
     }).sort((a, b) => b.totalCases - a.totalCases)
-  }, [selectedSubregions, allSubregionsSelected, selectedYear, selectedDiseases, allDiseasesSelected, availableSubregions])
+  }, [availableCountries, selectedCountries, allCountriesSelected, selectedYear, selectedDiseases, allDiseasesSelected])
 
   const totalCases  = overview.reduce((s, c) => s + c.totalCases,    0)
   const totalDeaths = overview.reduce((s, c) => s + c.totalDeaths,   0)
   const totalObs    = overview.reduce((s, c) => s + c.outbreakCount, 0)
 
-  const diseaseSubtitle = allDiseasesSelected
-    ? 'All countries, all diseases'
-    : `All countries, ${selectedDiseases.length} disease${selectedDiseases.length !== 1 ? 's' : ''}`
+  const countryLabel = allCountriesSelected
+    ? 'All countries'
+    : `${selectedCountries.length} countr${selectedCountries.length !== 1 ? 'ies' : 'y'}`
 
-  // Per-country detail data for the map hover panel
+  const diseaseSubtitle = allDiseasesSelected
+    ? `${countryLabel}, all diseases`
+    : `${countryLabel}, ${selectedDiseases.length} disease${selectedDiseases.length !== 1 ? 's' : ''}`
+
+  // Per-country detail data for the map hover panel — always all countries in subregion
   const detailData = useMemo(() => {
-    const activeSubs = (allSubregionsSelected || !selectedSubregions.length)
-      ? availableSubregions : selectedSubregions
-    const countries = activeSubs.flatMap(sub => getCountriesBySubregion(sub))
     const years = selectedYear === 'all' ? YEARS : [Number(selectedYear)]
 
     const result = {}
-    countries.forEach(c => {
+    availableCountries.forEach(c => {
       const iso = c.iso_3_code
 
       // Disease case breakdown (top 5)
@@ -135,7 +153,7 @@ export default function RegionalDashboard() {
       result[iso] = { diseases, totalFunding, domesticFunding, externalFunding, epidemiologists, feltp, labTech }
     })
     return result
-  }, [selectedSubregions, allSubregionsSelected, selectedYear, availableSubregions])
+  }, [availableCountries, selectedYear])
 
   // Pass the first selected subregion to map for centering; fall back to first available
   const mapSubregion = selectedSubregions[0] ?? availableSubregions[0]
@@ -153,7 +171,7 @@ export default function RegionalDashboard() {
               <div className="page-breadcrumb">Regional Overview</div>
               <h1 className="page-title">{regionLabel} Regional Dashboard</h1>
               <p className="page-desc">
-                {overview.length} countries · {yearLabel} surveillance data
+                {overview.length} of {availableCountries.length} countries · {yearLabel} surveillance data
               </p>
             </div>
             <div className="page-header-controls">
@@ -169,6 +187,16 @@ export default function RegionalDashboard() {
                   />
                 </div>
               )}
+              <div className="control-group">
+                <label className="control-label">Country</label>
+                <MultiSelectDropdown
+                  options={availableCountries.map(c => ({ value: c.iso_3_code, label: c.country_name }))}
+                  selected={selectedCountries}
+                  onChange={setSelectedCountries}
+                  placeholder="Select country…"
+                  allLabel="All Countries"
+                />
+              </div>
               <div className="control-group">
                 <label className="control-label">Disease</label>
                 <MultiSelectDropdown
