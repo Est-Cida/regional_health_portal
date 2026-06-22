@@ -1,8 +1,10 @@
 import { createContext, useContext, useState, useMemo } from 'react'
 import { useAuth } from './AuthContext'
-import { getCountries, getCountriesBySubregion, getCountry } from '../data/dataService'
+import { getCountries, getCountriesBySubregion, getCountry, getDiseaseList } from '../data/dataService'
 
 const CountryContext = createContext(null)
+
+const ALL_DISEASES = getDiseaseList()
 
 export function CountryProvider({ children }) {
   const { user } = useAuth()
@@ -17,8 +19,9 @@ export function CountryProvider({ children }) {
     ? [user.country_code]
     : availableCountries.slice(0, 1).map(c => c.iso_3_code)
 
-  const [selectedIsos,  setSelectedIsos]  = useState(defaultIsos)
-  const [selectedYears, setSelectedYears] = useState([2024])
+  const [selectedIsos,     setSelectedIsos]     = useState(defaultIsos)
+  const [selectedYears,    setSelectedYears]    = useState([2024])
+  const [selectedDiseases, setSelectedDiseases] = useState([...ALL_DISEASES])
 
   // Primary values for CRUD operations and labels
   const primaryIso  = selectedIsos[0]  ?? null
@@ -31,8 +34,10 @@ export function CountryProvider({ children }) {
 
   return (
     <CountryContext.Provider value={{
-      selectedIsos,  setSelectedIsos,
-      selectedYears, setSelectedYears,
+      selectedIsos,     setSelectedIsos,
+      selectedYears,    setSelectedYears,
+      selectedDiseases, setSelectedDiseases,
+      allDiseases: ALL_DISEASES,
       primaryIso,
       primaryYear,
       country,

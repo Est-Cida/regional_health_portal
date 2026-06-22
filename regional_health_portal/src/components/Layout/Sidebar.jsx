@@ -44,8 +44,18 @@ export default function Sidebar() {
   })
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--sidebar-w', collapsed ? COLLAPSED_W : EXPANDED_W)
+    const apply = () => {
+      if (window.innerWidth < 768) {
+        document.documentElement.style.setProperty('--sidebar-w', '0px')
+      } else {
+        document.documentElement.style.setProperty('--sidebar-w', collapsed ? COLLAPSED_W : EXPANDED_W)
+        document.body.classList.remove('sidebar-open')
+      }
+    }
+    apply()
     try { sessionStorage.setItem(STORAGE_KEY, collapsed) } catch {}
+    window.addEventListener('resize', apply)
+    return () => window.removeEventListener('resize', apply)
   }, [collapsed])
 
   if (!user) return null
@@ -53,6 +63,8 @@ export default function Sidebar() {
   const items = NAV_ITEMS[user.role] || NAV_ITEMS.country_admin
 
   return (
+    <>
+    <div className="sidebar-backdrop" onClick={() => document.body.classList.remove('sidebar-open')} />
     <aside className={`sidebar${collapsed ? ' sidebar-collapsed' : ''}`}>
 
       {/* Brand + toggle */}
@@ -115,5 +127,6 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
+    </>
   )
 }

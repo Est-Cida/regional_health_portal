@@ -81,7 +81,7 @@ function aggregateByYear(rows, sumFields, avgFields) {
 }
 
 export default function CapacityDashboard() {
-  const { selectedIsos, selectedYears } = useCountry()
+  const { selectedIsos, selectedYears, availableCountries } = useCountry()
   const { state, update, remove } = useDataStore()
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
@@ -136,6 +136,33 @@ export default function CapacityDashboard() {
       idsr_weekly_compliance_pct: rows.reduce((s, r) => s + r.idsr_weekly_compliance_pct, 0) / n,
     }
   }, [reportingAll, selectedYears])
+
+  const isoToName = useMemo(() => {
+    const map = {}
+    availableCountries.forEach(c => { map[c.iso_3_code] = c.country_name })
+    return map
+  }, [availableCountries])
+
+  // Per-country workforce totals for multi-country comparison chart
+  const workforceByCountry = useMemo(() => {
+    if (selectedIsos.length <= 1) return []
+    return selectedIsos.map(iso => {
+      const rows = state.workforce.filter(r =>
+        r.iso_3_code === iso &&
+        (!selectedYears.length || selectedYears.includes(r.year))
+      )
+      const epi  = rows.reduce((s, r) => s + (r.epidemiologists_total    || 0), 0)
+      const feltp = rows.reduce((s, r) => s + (r.feltp_trained_total     || 0), 0)
+      const lab  = rows.reduce((s, r) => s + (r.lab_technicians_total    || 0), 0)
+      return {
+        country: isoToName[iso] || iso,
+        epidemiologists: epi,
+        feltp_trained: feltp,
+        lab_technicians: lab,
+        _total: epi + feltp + lab,
+      }
+    }).sort((a, b) => b._total - a._total)
+  }, [state.workforce, selectedIsos, selectedYears, isoToName])
 
   // Raw rows for Data Table tab
   const wfTableRows  = useMemo(() =>
@@ -206,6 +233,31 @@ export default function CapacityDashboard() {
             </ResponsiveContainer>
           </div>
         </div>
+
+        {multiIso && workforceByCountry.length > 0 && (
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="card-header">
+              <h2 className="card-title">Workforce Capacity by Country</h2>
+              <span className="card-subtitle">{yLabel} · sorted by total workforce</span>
+            </div>
+            <ResponsiveContainer width="100%" height={Math.max(260, workforceByCountry.length * 46) + 48}>
+              <BarChart
+                data={workforceByCountry}
+                layout="vertical"
+                margin={{ top: 4, right: 32, left: 4, bottom: 4 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7C93' }} />
+                <YAxis type="category" dataKey="country" width={160} tick={{ fontSize: 11, fill: '#1A2B4A' }} />
+                <Tooltip content={<ChartTooltip />} />
+                <Legend verticalAlign="top" height={40} wrapperStyle={{ fontSize: 11, top: 0 }} />
+                <Bar dataKey="epidemiologists"  name="Epidemiologists"  fill="#0071BC" radius={[0, 3, 3, 0]} />
+                <Bar dataKey="feltp_trained"    name="FELTP Trained"    fill="#059669" radius={[0, 3, 3, 0]} />
+                <Bar dataKey="lab_technicians"  name="Lab Technicians"  fill="#7B2D8B" radius={[0, 3, 3, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </section>
 
       <section className="section">

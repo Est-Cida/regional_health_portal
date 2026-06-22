@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react'
 import { useCountry } from '../../context/CountryContext'
 import { useDataStore, rowId } from '../../context/DataStore'
 import { useAuth } from '../../context/AuthContext'
-import { getDiseaseList, YEARS } from '../../data/dataService'
+import { YEARS } from '../../data/dataService'
 import EditRecordModal from '../../components/EditRecordModal'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import PageTabs from '../../components/PageTabs'
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer,
 } from 'recharts'
 
@@ -21,6 +22,14 @@ const DISEASE_COLORS = {
   'Polio (cVDPV)':             '#059669',
 }
 const DEFAULT_COLOR = '#6B7C93'
+
+const YEAR_COLORS = {
+  2021: '#0071BC',
+  2022: '#F7941D',
+  2023: '#7B2D8B',
+  2024: '#059669',
+  2025: '#C00000',
+}
 
 const fmt = v => v >= 1_000_000 ? `${(v/1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}k` : v
 
@@ -63,7 +72,7 @@ function DeleteBtn({ onClick }) {
 }
 
 export default function DiseaseDashboard() {
-  const { selectedIsos, selectedYears } = useCountry()
+  const { selectedIsos, selectedYears, selectedDiseases, allDiseases: ALL_DISEASES, availableCountries } = useCountry()
   const { state, update, remove } = useDataStore()
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
@@ -76,13 +85,21 @@ export default function DiseaseDashboard() {
   const yLabel = !selectedYears.length || selectedYears.length === YEARS.length
     ? 'All Years' : selectedYears.length === 1 ? String(selectedYears[0]) : `${selectedYears.length} Years`
 
-  const allDiseases = useMemo(() => getDiseaseList(), [])
+  const allDiseases = ALL_DISEASES
+  const allDiseasesSelected = selectedDiseases.length === allDiseases.length
 
-  // Disease summary: aggregate by disease for selected isos + years
+  const isoToName = useMemo(() => {
+    const m = {}
+    availableCountries.forEach(c => { m[c.iso_3_code] = c.country_name })
+    return m
+  }, [availableCountries])
+
+  // Disease summary: aggregate by disease for selected isos + years + diseases
   const diseases = useMemo(() => {
     const rows = state.surveillance.filter(s =>
       (!selectedIsos.length  || selectedIsos.includes(s.iso_3_code)) &&
-      (!selectedYears.length || selectedYears.includes(s.year))
+      (!selectedYears.length || selectedYears.includes(s.year)) &&
+      (allDiseasesSelected   || selectedDiseases.includes(s.disease))
     )
     const byDisease = {}
     rows.forEach(s => {
@@ -102,18 +119,41 @@ export default function DiseaseDashboard() {
     }))
   }, [state.surveillance, selectedIsos, selectedYears])
 
-  // Multi-disease trend matrix (cases per year, summed across selected countries)
+  // Multi-disease trend matrix — only show selected diseases
   const matrix = useMemo(() =>
     YEARS.map(year => {
       const row = { year }
       allDiseases.forEach(d => {
+        if (!allDiseasesSelected && !selectedDiseases.includes(d)) return
         const entries = state.surveillance.filter(
           s => (!selectedIsos.length || selectedIsos.includes(s.iso_3_code)) && s.year === year && s.disease === d
         )
         row[d] = entries.reduce((sum, e) => sum + (e.cases_reported ?? 0), 0)
       })
       return row
-    }), [state.surveillance, selectedIsos, allDiseases])
+    }), [state.surveillance, selectedIsos, allDiseases, selectedDiseases, allDiseasesSelected])
+
+  // Countries reporting by year — grouped horizontal bar chart (multi-country only)
+  const countriesByYear = useMemo(() => {
+    if (selectedIsos.length <= 1) return []
+    const yrs = selectedYears.length ? selectedYears : YEARS
+    return selectedIsos.map(iso => {
+      const entry = { country: isoToName[iso] || iso }
+      yrs.forEach(yr => {
+        entry[yr] = state.surveillance
+          .filter(s =>
+            s.iso_3_code === iso &&
+            s.year === yr &&
+            (allDiseasesSelected || selectedDiseases.includes(s.disease))
+          )
+          .reduce((sum, s) => sum + (s.cases_reported || 0), 0)
+      })
+      entry._total = yrs.reduce((sum, yr) => sum + (entry[yr] || 0), 0)
+      return entry
+    }).sort((a, b) => b._total - a._total)
+  }, [state.surveillance, selectedIsos, selectedYears, selectedDiseases, allDiseasesSelected, isoToName])
+
+  const activeYears = selectedYears.length ? selectedYears : YEARS
 
   // Single disease 5-year trend
   const diseaseTrend = useMemo(() => {
@@ -137,9 +177,10 @@ export default function DiseaseDashboard() {
   const allSurvRows = useMemo(() =>
     state.surveillance.filter(s =>
       (!selectedIsos.length  || selectedIsos.includes(s.iso_3_code)) &&
-      (!selectedYears.length || selectedYears.includes(s.year))
+      (!selectedYears.length || selectedYears.includes(s.year)) &&
+      (allDiseasesSelected   || selectedDiseases.includes(s.disease))
     ).sort((a, b) => b.year - a.year || a.iso_3_code.localeCompare(b.iso_3_code) || a.disease.localeCompare(b.disease))
-  , [state.surveillance, selectedIsos, selectedYears])
+  , [state.surveillance, selectedIsos, selectedYears, selectedDiseases, allDiseasesSelected])
 
   function handleSaveEdit(changes) {
     update('surveillance', rowId('surveillance', editRecord), changes)
@@ -234,6 +275,55 @@ export default function DiseaseDashboard() {
           </ResponsiveContainer>
         </div>
       </section>
+
+      {multiIso && countriesByYear.length > 0 && (
+        <section className="section">
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Cases Reported by Country &amp; Year</h2>
+              <span className="card-subtitle">Sorted by total cases · {yLabel}</span>
+            </div>
+            <ResponsiveContainer width="100%" height={Math.max(300, countriesByYear.length * 44 + 60)}>
+              <BarChart
+                data={countriesByYear}
+                layout="vertical"
+                margin={{ top: 8, right: 32, left: 8, bottom: 8 }}
+                barCategoryGap="20%"
+                barGap={2}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5EAF0" horizontal={false} />
+                <XAxis
+                  type="number"
+                  tickFormatter={fmt}
+                  tick={{ fontSize: 11, fill: '#6B7C93' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="country"
+                  width={130}
+                  tick={{ fontSize: 11, fill: '#1A2B4A' }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<ChartTooltip />} />
+                <Legend verticalAlign="top" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
+                {activeYears.map(yr => (
+                  <Bar
+                    key={yr}
+                    dataKey={yr}
+                    name={String(yr)}
+                    fill={YEAR_COLORS[yr] || DEFAULT_COLOR}
+                    radius={[0, 3, 3, 0]}
+                    maxBarSize={18}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      )}
 
       <section className="section">
         <div className="card">
