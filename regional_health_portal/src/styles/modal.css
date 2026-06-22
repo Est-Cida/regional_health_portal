@@ -1,0 +1,189 @@
+/* ── Modal ────────────────────────────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 43, 74, .48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9000;
+  padding: 24px;
+  animation: fadeIn .15s ease;
+}
+
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+.modal {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0,0,0,.24);
+  width: 100%;
+  max-width: 540px;
+  max-height: 92vh;
+  overflow-y: auto;
+  animation: slideUp .2s ease;
+}
+
+@keyframes slideUp { from { transform: translateY(16px); opacity: 0 } to { transform: none; opacity: 1 } }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1.5px solid #E5EAF0;
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--who-dark);
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--who-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+}
+.modal-close:hover { background: #F1F5F9; color: var(--who-dark); }
+
+.modal-readonly-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 12px 24px;
+  background: #F8FAFC;
+  border-bottom: 1px solid #E5EAF0;
+}
+
+.readonly-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.readonly-label { color: var(--who-muted); }
+
+.readonly-value {
+  font-weight: 600;
+  color: var(--who-dark);
+  background: #E5EAF0;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+/* ── Modal Form ───────────────────────────────────────────────────────────── */
+
+.modal-form { padding: 20px 24px 24px; }
+
+.modal-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px 20px;
+  margin-bottom: 24px;
+}
+
+.form-field-wide { grid-column: 1 / -1; }
+
+.form-label { font-size: 12px; font-weight: 600; color: #4B5563; }
+
+.form-input {
+  border: 1.5px solid #D1D5DB;
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--who-dark);
+  background: #fff;
+  outline: none;
+  font-family: inherit;
+  transition: border-color .15s, box-shadow .15s;
+  width: 100%;
+}
+.form-input:focus {
+  border-color: var(--who-blue);
+  box-shadow: 0 0 0 3px rgba(0,113,188,.12);
+}
+.form-input-error { border-color: var(--danger) !important; }
+
+.form-error { font-size: 11px; color: var(--danger); }
+
+/* ── Modal Actions ────────────────────────────────────────────────────────── */
+
+.modal-actions        { display: flex; justify-content: flex-end; gap: 10px; }
+.modal-actions-center { justify-content: center; }
+
+.btn-primary {
+  padding: 8px 22px;
+  background: var(--who-blue);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+  font-family: inherit;
+}
+.btn-primary:hover { background: var(--who-blue-dark); }
+
+.btn-secondary {
+  padding: 8px 22px;
+  background: #F1F5F9;
+  color: #4B5563;
+  border: 1.5px solid #D1D5DB;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+  font-family: inherit;
+}
+.btn-secondary:hover { background: #E5EAF0; }
+
+.btn-danger {
+  padding: 8px 22px;
+  background: var(--danger);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+  font-family: inherit;
+}
+.btn-danger:hover { background: #9a0000; }
+
+/* ── Confirm Dialog ───────────────────────────────────────────────────────── */
+
+.confirm-modal { max-width: 360px; }
+
+.confirm-body {
+  padding: 32px 24px 28px;
+  text-align: center;
+}
+
+.confirm-icon { font-size: 44px; margin-bottom: 16px; }
+
+.confirm-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--who-dark);
+  margin-bottom: 8px;
+}
+
+.confirm-message {
+  font-size: 14px;
+  color: var(--who-muted);
+  margin-bottom: 28px;
+  line-height: 1.6;
+}
