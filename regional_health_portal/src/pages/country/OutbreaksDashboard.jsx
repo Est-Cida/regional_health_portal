@@ -49,12 +49,14 @@ export default function OutbreaksDashboard() {
   const { user } = useAuth()
   const canEdit = user.role === 'country_admin'
 
-  const [view,          setView]          = useState('charts')
-  const [filterYear,    setFilterYear]    = useState('all')
-  const [filterDisease, setFilterDisease] = useState('all')
-  const [editRecord,    setEditRecord]    = useState(null)
-  const [deleteRecord,  setDeleteRecord]  = useState(null)
-  const [showAdd,       setShowAdd]       = useState(false)
+  const [view,           setView]           = useState('charts')
+  const [filterYear,     setFilterYear]     = useState('all')
+  const [filterDisease,  setFilterDisease]  = useState('all')
+  const [editRecord,     setEditRecord]     = useState(null)
+  const [deleteRecord,   setDeleteRecord]   = useState(null)
+  const [showAdd,        setShowAdd]        = useState(false)
+  const [topByDisease,   setTopByDisease]   = useState('all')
+  const [topByCountry,   setTopByCountry]   = useState('all')
 
   const diseases  = useMemo(() => getDiseaseList(), [])
   const multiIso  = selectedIsos.length > 1
@@ -77,10 +79,12 @@ export default function OutbreaksDashboard() {
   const avgDetection = filtered.length ? (filtered.reduce((s, o) => s + (o.time_to_detection_days || 0), 0) / filtered.length).toFixed(1) : '—'
   const totalCases   = filtered.reduce((s, o) => s + (o.cases || 0), 0)
 
-  const byDisease = diseases
+  const byDiseaseAll = diseases
     .map(d => ({ disease: d, count: allOutbreaks.filter(o => o.disease === d).length }))
     .filter(d => d.count > 0)
     .sort((a, b) => b.count - a.count)
+
+  const byDisease = topByDisease === 'all' ? byDiseaseAll : byDiseaseAll.slice(0, Number(topByDisease))
 
   const byYear = YEARS.map(y => ({
     year: y,
@@ -93,7 +97,7 @@ export default function OutbreaksDashboard() {
     return map
   }, [availableCountries])
 
-  const byCountry = useMemo(() => {
+  const byCountryAll = useMemo(() => {
     if (selectedIsos.length <= 1) return []
     return selectedIsos
       .map(iso => ({
@@ -102,6 +106,8 @@ export default function OutbreaksDashboard() {
       }))
       .sort((a, b) => b.count - a.count)
   }, [allOutbreaks, selectedIsos, isoToName])
+
+  const byCountry = topByCountry === 'all' ? byCountryAll : byCountryAll.slice(0, Number(topByCountry))
 
   function handleSaveEdit(changes) {
     update('outbreaks', rowId('outbreaks', editRecord), changes)
@@ -161,9 +167,16 @@ export default function OutbreaksDashboard() {
           <div className="card">
             <div className="card-header">
               <h2 className="card-title">Outbreaks by Disease</h2>
-              <span className="card-subtitle">All years combined</span>
+              <div className="card-filters">
+                <span className="card-subtitle">All years combined</span>
+                <select className="select-control select-sm" value={topByDisease} onChange={e => setTopByDisease(e.target.value)}>
+                  <option value="3">Top 3</option>
+                  <option value="5">Top 5</option>
+                  <option value="all">All</option>
+                </select>
+              </div>
             </div>
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={Math.max(180, byDisease.length * 38 + 16)}>
               <BarChart data={byDisease} layout="vertical" margin={{ top: 4, right: 20, left: 140, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
                 <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7C93' }} />
@@ -191,12 +204,21 @@ export default function OutbreaksDashboard() {
         </div>
       </section>
 
-      {byCountry.length > 0 && (
+      {byCountryAll.length > 0 && (
         <section className="section">
           <div className="card">
             <div className="card-header">
               <h2 className="card-title">Outbreaks by Country</h2>
-              <span className="card-subtitle">All years combined · highest to lowest</span>
+              <div className="card-filters">
+                <span className="card-subtitle">All years combined · highest to lowest</span>
+                <select className="select-control select-sm" value={topByCountry} onChange={e => setTopByCountry(e.target.value)}>
+                  <option value="5">Top 5</option>
+                  <option value="10">Top 10</option>
+                  <option value="15">Top 15</option>
+                  <option value="20">Top 20</option>
+                  <option value="all">All</option>
+                </select>
+              </div>
             </div>
             <ResponsiveContainer width="100%" height={Math.max(220, byCountry.length * 38) + 8}>
               <BarChart
