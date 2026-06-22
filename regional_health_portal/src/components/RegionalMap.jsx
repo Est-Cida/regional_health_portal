@@ -1,11 +1,31 @@
-import { useEffect } from 'react'
-import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap } from 'react-leaflet'
+import { useEffect, useState, useMemo } from 'react'
+import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
+import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-// ── colour + size helpers ─────────────────────────────────────────────────────
+// ── Module-level boundary cache (fetched once per session) ────────────────────
+let _boundaryCache = null
+const API = 'http://localhost:8000'
 
-function markerColor(value, max) {
-  if (!max || value === 0) return '#94A3B8'
+function useBoundaries() {
+  const [data, setData] = useState(_boundaryCache)
+  useEffect(() => {
+    if (_boundaryCache) return
+    const token = localStorage.getItem('who_afro_portal_token')
+    fetch(`${API}/api/boundaries/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(fc => { _boundaryCache = fc; setData(fc) })
+      .catch(err => console.error('Boundary fetch failed:', err))
+  }, [])
+  return data
+}
+
+// ── Colour helpers ────────────────────────────────────────────────────────────
+
+function choroplethColor(value, max) {
+  if (!max || value === 0) return '#CBD5E1'
   const r = value / max
   if (r > 0.70) return '#C00000'
   if (r > 0.40) return '#D97706'
@@ -13,50 +33,126 @@ function markerColor(value, max) {
   return '#059669'
 }
 
-function markerRadius(value, max) {
-  if (!max || value === 0) return 7
-  return 9 + Math.sqrt(value / max) * 28
-}
+const LEGEND_ITEMS = [
+  { color: '#059669', label: 'Low'      },
+  { color: '#0071BC', label: 'Moderate' },
+  { color: '#D97706', label: 'High'     },
+  { color: '#C00000', label: 'Critical' },
+  { color: '#CBD5E1', label: 'No data'  },
+]
 
-// ── auto-fit to visible markers whenever overview changes ─────────────────────
+// ── Auto-fit to the filtered features ─────────────────────────────────────────
 
-function FitBounds({ positions }) {
+function FitBounds({ geojsonData }) {
   const map = useMap()
   useEffect(() => {
-    if (positions.length > 0) {
-      map.fitBounds(positions, { padding: [48, 48], maxZoom: 7 })
-    }
-  }, [map, positions])
+    if (!geojsonData?.features?.length) return
+    try {
+      const layer = L.geoJSON(geojsonData)
+      const bounds = layer.getBounds()
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [24, 24], maxZoom: 7 })
+      }
+    } catch (e) { /* ignore */ }
+  }, [map, geojsonData])
   return null
 }
 
-// ── metric config ─────────────────────────────────────────────────────────────
+// ── Metric config ──────────────────────────────────────────────────────────────
 
 const METRIC_CFG = {
-  totalCases:    { label: 'Total Cases',    fmt: v => v.toLocaleString() },
-  totalDeaths:   { label: 'Total Deaths',   fmt: v => v.toLocaleString() },
-  outbreakCount: { label: 'Outbreaks',      fmt: v => String(v)          },
+  totalCases:    { label: 'Total Cases',  fmt: v => v.toLocaleString() },
+  totalDeaths:   { label: 'Total Deaths', fmt: v => v.toLocaleString() },
+  outbreakCount: { label: 'Outbreaks',    fmt: v => String(v)          },
 }
 
-const LEGEND_ITEMS = [
-  { color: '#059669', label: 'Low'  },
-  { color: '#0071BC', label: 'Moderate' },
-  { color: '#D97706', label: 'High' },
-  { color: '#C00000', label: 'Critical' },
-  { color: '#94A3B8', label: 'No data'  },
-]
-
-// ── component ─────────────────────────────────────────────────────────────────
+// ── Main component ─────────────────────────────────────────────────────────────
 
 export default function RegionalMap({ overview, metric = 'totalCases', year, subregion }) {
+  const boundaries = useBoundaries()
   const cfg = METRIC_CFG[metric] || METRIC_CFG.totalCases
+
+  // Build iso3 → country data lookup from the overview prop
+  const overviewMap = useMemo(() => {
+    const m = {}
+    overview.forEach(c => { m[c.iso3] = c })
+    return m
+  }, [overview])
 
   const values = overview.map(c => c[metric] || 0)
   const max    = Math.max(...values, 1)
 
-  const positions = overview
-    .filter(c => c.lat && c.lng)
-    .map(c => [c.lat, c.lng])
+  // Subset of boundaries matching the selected sub-region countries
+  const visibleIsos = useMemo(() => new Set(overview.map(c => c.iso3)), [overview])
+
+  // Key forces GeoJSON layer to re-mount when metric or values change
+  const geoKey = useMemo(
+    () => `${metric}|${overview.map(c => `${c.iso3}:${c[metric] ?? 0}`).join(',')}`,
+    [metric, overview]
+  )
+
+  // GeoJSON style callback
+  function styleFeature(feature) {
+    const iso  = feature.properties.iso3
+    const data = overviewMap[iso]
+    const val  = data ? (data[metric] || 0) : null
+    const inView = visibleIsos.has(iso)
+
+    return {
+      fillColor:   inView ? choroplethColor(val, max) : '#E2E8F0',
+      fillOpacity: inView ? 0.78 : 0.35,
+      color:       inView ? '#fff' : '#C4CDD9',
+      weight:      inView ? 1.2 : 0.6,
+    }
+  }
+
+  // Tooltip + popup per feature
+  function onEachFeature(feature, layer) {
+    const iso  = feature.properties.iso3
+    const data = overviewMap[iso]
+
+    if (!data) {
+      layer.bindTooltip(
+        `<div class="map-tooltip"><strong>${feature.properties.name}</strong><span style="opacity:.6">Not in current filter</span></div>`,
+        { sticky: true }
+      )
+      return
+    }
+
+    const val = data[metric] || 0
+
+    layer.bindTooltip(
+      `<div class="map-tooltip">
+        <strong>${data.country_name}</strong>
+        <span>${cfg.label}: <b>${cfg.fmt(val)}</b></span>
+        ${data.priority === 1 ? '<span class="map-tt-priority">⚑ High Priority</span>' : ''}
+      </div>`,
+      { sticky: true }
+    )
+
+    layer.bindPopup(
+      `<div class="map-popup">
+        <div class="map-popup-title">${data.country_name}</div>
+        <div class="map-popup-iso">${iso} · ${data.subregion} Africa · ${year}</div>
+        <div class="map-popup-divider"></div>
+        <div class="map-popup-grid">
+          <span>Cases</span>     <strong>${data.totalCases.toLocaleString()}</strong>
+          <span>Deaths</span>    <strong>${data.totalDeaths.toLocaleString()}</strong>
+          <span>Avg CFR</span>   <strong>${data.avgCFR.toFixed(2)}%</strong>
+          <span>Outbreaks</span> <strong>${data.outbreakCount}</strong>
+          <span>Priority</span>  <strong style="color:${
+            data.priority === 1 ? '#C00000' : data.priority === 2 ? '#D97706' : '#059669'
+          }">${data.priority === 1 ? 'High' : data.priority === 2 ? 'Medium' : 'Standard'}</strong>
+        </div>
+      </div>`,
+      { maxWidth: 260 }
+    )
+
+    layer.on({
+      mouseover(e) { e.target.setStyle({ fillOpacity: 0.92, weight: 2.2, color: '#1A2B4A' }) },
+      mouseout(e)  { e.target.setStyle(styleFeature(feature)) },
+    })
+  }
 
   return (
     <div className="regional-map-wrap">
@@ -68,60 +164,31 @@ export default function RegionalMap({ overview, metric = 'totalCases', year, sub
         zoomControl={true}
       >
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           subdomains="abcd"
           maxZoom={19}
         />
 
-        {positions.length > 0 && <FitBounds positions={positions} />}
+        {boundaries && (
+          <>
+            <GeoJSON
+              key={geoKey}
+              data={boundaries}
+              style={styleFeature}
+              onEachFeature={onEachFeature}
+            />
+            <FitBounds geojsonData={{ features: boundaries.features.filter(f => visibleIsos.has(f.properties.iso3)) }} />
+          </>
+        )}
 
-        {overview.map(c => {
-          if (!c.lat || !c.lng) return null
-          const val    = c[metric] || 0
-          const color  = markerColor(val, max)
-          const radius = markerRadius(val, max)
-
-          return (
-            <CircleMarker
-              key={c.iso3}
-              center={[c.lat, c.lng]}
-              radius={radius}
-              pathOptions={{
-                fillColor:   color,
-                fillOpacity: 0.82,
-                color:       '#fff',
-                weight:      c.priority === 1 ? 2.5 : 1.5,
-                opacity:     1,
-              }}
-            >
-              <Tooltip sticky>
-                <div className="map-tooltip">
-                  <strong>{c.country_name}</strong>
-                  <span>{cfg.label}: <b>{cfg.fmt(val)}</b></span>
-                  {c.priority === 1 && <span className="map-tt-priority">⚑ High Priority</span>}
-                </div>
-              </Tooltip>
-
-              <Popup maxWidth={240}>
-                <div className="map-popup">
-                  <div className="map-popup-title">{c.country_name}</div>
-                  <div className="map-popup-iso">{c.iso3} · {subregion} Africa · {year}</div>
-                  <div className="map-popup-divider" />
-                  <div className="map-popup-grid">
-                    <span>Cases</span>       <strong>{c.totalCases.toLocaleString()}</strong>
-                    <span>Deaths</span>      <strong>{c.totalDeaths.toLocaleString()}</strong>
-                    <span>Avg CFR</span>     <strong>{c.avgCFR.toFixed(2)}%</strong>
-                    <span>Outbreaks</span>   <strong>{c.outbreakCount}</strong>
-                    <span>Priority</span>    <strong style={{ color: c.priority === 1 ? '#C00000' : c.priority === 2 ? '#D97706' : '#059669' }}>
-                      {c.priority === 1 ? 'High' : c.priority === 2 ? 'Medium' : 'Standard'}
-                    </strong>
-                  </div>
-                </div>
-              </Popup>
-            </CircleMarker>
-          )
-        })}
+        {/* Label tile layer on top so country names render over the polygons */}
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
+          subdomains="abcd"
+          maxZoom={19}
+          pane="shadowPane"
+        />
       </MapContainer>
 
       {/* Legend */}
@@ -132,7 +199,12 @@ export default function RegionalMap({ overview, metric = 'totalCases', year, sub
             <span>{item.label}</span>
           </div>
         ))}
-        <div className="map-legend-note">Circle size ∝ {cfg.label.toLowerCase()}</div>
+        {!boundaries && (
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6B7C93', fontStyle: 'italic' }}>
+            Loading boundaries…
+          </span>
+        )}
+        <div className="map-legend-note">Colour intensity ∝ {cfg.label.toLowerCase()}</div>
       </div>
     </div>
   )
