@@ -30,40 +30,42 @@ const MAP_METRICS = [
 export default function RegionalDashboard() {
   const { user } = useAuth()
 
-  const availableSubregions = user.role === 'super_admin' ? SUBREGIONS : [user.subregion]
+  // Default selection: super_admin starts with all regions, others start with their own
+  const defaultSubregions = user.role === 'super_admin'
+    ? [...SUBREGIONS]
+    : [user.subregion].filter(Boolean)
 
-  const [selectedSubregions, setSelectedSubregions] = useState([availableSubregions[0]])
+  const [selectedSubregions, setSelectedSubregions] = useState(defaultSubregions)
   const [selectedYear,       setSelectedYear]       = useState(2024)
   const [selectedDiseases,   setSelectedDiseases]   = useState([...ALL_DISEASES])
   const [mapMetric,          setMapMetric]          = useState('totalCases')
 
-  const allSubregionsSelected = selectedSubregions.length === availableSubregions.length
+  const allSubregionsSelected = selectedSubregions.length === SUBREGIONS.length
   const allDiseasesSelected   = selectedDiseases.length   === ALL_DISEASES.length
   const yearLabel = selectedYear === 'all' ? 'All Years' : selectedYear
 
-  // Countries available under current sub-region selection
+  // Countries available under current region selection
   const availableCountries = useMemo(() => {
     const activeSubs = (allSubregionsSelected || !selectedSubregions.length)
-      ? availableSubregions : selectedSubregions
+      ? SUBREGIONS : selectedSubregions
     return activeSubs.flatMap(sub => getCountriesBySubregion(sub))
-  }, [selectedSubregions, allSubregionsSelected, availableSubregions])
+  }, [selectedSubregions, allSubregionsSelected])
 
   const [selectedCountries, setSelectedCountries] = useState(
     () => availableCountries.map(c => c.iso_3_code)
   )
 
-  // Reset country filter whenever the available pool changes (sub-region switch)
+  // Reset country filter whenever the available pool changes (region switch)
   useEffect(() => {
     setSelectedCountries(availableCountries.map(c => c.iso_3_code))
   }, [availableCountries])
 
   const allCountriesSelected = selectedCountries.length === availableCountries.length
 
-  // Title reflects current selection
   const regionLabel = useMemo(() => {
     if (allSubregionsSelected || !selectedSubregions.length) return 'WHO AFRO'
     if (selectedSubregions.length === 1) return `${selectedSubregions[0]} Africa`
-    return `${selectedSubregions.length} Sub-regions`
+    return `${selectedSubregions.length} Regions`
   }, [selectedSubregions, allSubregionsSelected])
 
   const overview = useMemo(() => {
@@ -155,8 +157,7 @@ export default function RegionalDashboard() {
     return result
   }, [availableCountries, selectedYear])
 
-  // Pass the first selected subregion to map for centering; fall back to first available
-  const mapSubregion = selectedSubregions[0] ?? availableSubregions[0]
+  const mapSubregion = selectedSubregions[0] ?? SUBREGIONS[0]
 
   return (
     <div className="app-layout">
@@ -175,18 +176,16 @@ export default function RegionalDashboard() {
               </p>
             </div>
             <div className="page-header-controls">
-              {user.role === 'super_admin' && (
-                <div className="control-group">
-                  <label className="control-label">Sub-region</label>
-                  <MultiSelectDropdown
-                    options={availableSubregions.map(s => ({ value: s, label: `${s} Africa` }))}
-                    selected={selectedSubregions}
-                    onChange={setSelectedSubregions}
-                    placeholder="Select sub-region…"
-                    allLabel="All Sub-regions"
-                  />
-                </div>
-              )}
+              <div className="control-group">
+                <label className="control-label">Region</label>
+                <MultiSelectDropdown
+                  options={SUBREGIONS.map(s => ({ value: s, label: `${s} Africa` }))}
+                  selected={selectedSubregions}
+                  onChange={setSelectedSubregions}
+                  placeholder="Select region…"
+                  allLabel="All Regions"
+                />
+              </div>
               <div className="control-group">
                 <label className="control-label">Country</label>
                 <MultiSelectDropdown
