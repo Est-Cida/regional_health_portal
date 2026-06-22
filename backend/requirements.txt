@@ -1,25 +1,28 @@
-# WHO AFRO Regional Surveillance Portal — Python backend dependencies
-# Install with: pip install -r requirements.txt
-# Then pin bcrypt: pip install "bcrypt==4.2.1"
+# WHO AFRO Regional Health Surveillance Portal — Python backend dependencies
+# Install with:  pip install -r requirements.txt
+#
+# System requirement (not a Python package):
+#   PostgreSQL >= 14 with the PostGIS extension enabled
+#   Enable in psql: CREATE EXTENSION IF NOT EXISTS postgis;
 
-# Web framework & server
+# ── Web framework & ASGI server ────────────────────────────────────────────────
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 
-# Database
-sqlalchemy==2.0.36
-psycopg2==2.9.10
+# ── Database ───────────────────────────────────────────────────────────────────
+sqlalchemy==2.0.36          # ORM + raw SQL execution (ST_AsGeoJSON via text())
+psycopg2==2.9.10            # PostgreSQL / PostGIS driver
 
-# Auth — JWT + password hashing
+# ── Authentication — JWT + password hashing ────────────────────────────────────
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-# NOTE: passlib 1.7.4 is incompatible with bcrypt>=5.x
-# After installing this file, run: pip install "bcrypt==4.2.1"
+# IMPORTANT: passlib 1.7.4 is incompatible with bcrypt >= 5.x
+# bcrypt is pinned here to prevent auto-upgrade breaking password verification
 bcrypt==4.2.1
 
-# Request parsing & validation
-python-multipart==0.0.17
-pydantic==2.9.2
+# ── Request parsing & validation ───────────────────────────────────────────────
+python-multipart==0.0.17    # Required for FastAPI form data (login endpoint)
+pydantic==2.9.2             # Request/response schema validation
 
-# Environment variables
-python-dotenv==1.0.1
+# ── Environment configuration ──────────────────────────────────────────────────
+python-dotenv==1.0.1        # Loads .env file into os.environ at startup
