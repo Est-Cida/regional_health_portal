@@ -58,78 +58,69 @@ function fmtYearLabel(years) {
   return `${years.length} Years`
 }
 
-function TopCard({ rank, name, iso3, subregion, value, accent }) {
-  const regionCol = REGION_COLORS[subregion] || '#888'
+function MetricCell({ icon, label, value, accent, highlighted, last }) {
   return (
     <div style={{
-      minWidth: 158, maxWidth: 158, flexShrink: 0,
-      border: '1.5px solid #E5EAF0', borderRadius: 10,
-      overflow: 'hidden', background: '#fff',
-      boxShadow: '0 1px 4px rgba(26,43,74,0.07)',
+      padding: '13px 16px',
+      borderRight: last ? 'none' : '1px solid #F0F4FA',
+      background: highlighted ? accent + '09' : 'transparent',
+      minWidth: 0,
     }}>
-      <div style={{ height: 4, background: regionCol }} />
-      <div style={{ padding: '10px 13px 13px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
-          <span style={{
-            fontSize: 10, fontWeight: 800, color: regionCol,
-            background: regionCol + '18', padding: '2px 8px', borderRadius: 99,
-          }}>
-            #{rank}
-          </span>
-          <span style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-            {subregion}
-          </span>
-        </div>
-        <div style={{
-          fontSize: 12, fontWeight: 700, color: '#1A2B4A', marginBottom: 2,
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        }}>
-          {name}
-        </div>
-        <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 10 }}>{iso3}</div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: accent, lineHeight: 1.1 }}>{value}</div>
+      <div style={{
+        fontSize: 10, color: '#94a3b8', marginBottom: 5,
+        display: 'flex', alignItems: 'center', gap: 4,
+        textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600,
+        whiteSpace: 'nowrap',
+      }}>
+        <span style={{ fontSize: 12 }}>{icon}</span> {label}
+      </div>
+      <div style={{ fontSize: 17, fontWeight: 800, color: highlighted ? accent : '#1A2B4A', lineHeight: 1.1 }}>
+        {value ?? <span style={{ color: '#D1DBE8', fontWeight: 400, fontSize: 14 }}>—</span>}
       </div>
     </div>
   )
 }
 
-function TopRow({ label, icon, accent, subtitle, data, sliceN, valueKey, formatValue }) {
-  const rows = data.slice(0, sliceN)
+function CountryRankRow({ rank, country, iso3, subregion, data, sortBy }) {
+  const regionCol = REGION_COLORS[subregion] || '#888'
+  const { outbreaks, total_public_labs, accreditation_pct, epidemiologists, population, funding } = data
+  const fmtP = v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v ? `${(v / 1_000).toFixed(0)}k` : null
+  const fmtF = v => v ? `$${(v / 1_000_000).toFixed(1)}M` : null
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+    <div style={{
+      border: '1.5px solid #E5EAF0', borderLeft: `4px solid ${regionCol}`,
+      borderRadius: 10, background: '#fff',
+      boxShadow: '0 1px 4px rgba(26,43,74,0.06)',
+      overflow: 'hidden', marginBottom: 10,
+    }}>
+      <div style={{
+        padding: '9px 16px', display: 'flex', alignItems: 'center', gap: 10,
+        borderBottom: '1px solid #F0F4FA', background: regionCol + '07',
+      }}>
         <span style={{
-          width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-          background: accent + '18', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', fontSize: 15,
-        }}>
-          {icon}
+          fontSize: 10, fontWeight: 800, color: regionCol,
+          background: regionCol + '1A', padding: '2px 8px', borderRadius: 99, flexShrink: 0,
+        }}>#{rank}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#1A2B4A' }}>{country}</span>
+        <span style={{ fontSize: 11, color: '#94a3b8' }}>{iso3}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: regionCol, flexShrink: 0 }}>
+          {subregion} Africa
         </span>
-        <div>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#1A2B4A' }}>{label}</span>
-          {subtitle && (
-            <span style={{ fontSize: 11, color: '#6B7C93', marginLeft: 8 }}>{subtitle}</span>
-          )}
-        </div>
       </div>
-      {rows.length === 0 ? (
-        <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 4px' }}>No data for selected filters.</p>
-      ) : (
-        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
-          {rows.map((c, i) => (
-            <TopCard
-              key={c.iso3}
-              rank={i + 1}
-              name={c.country ?? c.country_name}
-              iso3={c.iso3}
-              subregion={c.subregion}
-              value={formatValue(c[valueKey])}
-              accent={accent}
-            />
-          ))}
-        </div>
-      )}
-      <div style={{ borderBottom: '1.5px solid #F0F4FA', margin: '16px 0' }} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)' }}>
+        <MetricCell icon="⚠️" label="Outbreaks"     accent="#C00000" highlighted={sortBy === 'outbreaks'}
+          value={outbreaks != null ? String(outbreaks) : null} />
+        <MetricCell icon="🔬" label="Lab Capacity"   accent="#0071BC" highlighted={sortBy === 'labs'}
+          value={total_public_labs != null
+            ? `${total_public_labs} labs${accreditation_pct != null ? ` · ${accreditation_pct.toFixed(0)}% acc.` : ''}`
+            : null} />
+        <MetricCell icon="🩺" label="Workforce"      accent="#059669" highlighted={sortBy === 'workforce'}
+          value={epidemiologists != null ? epidemiologists.toLocaleString() : null} />
+        <MetricCell icon="👥" label="Population"     accent="#7B2D8B" highlighted={sortBy === 'population'}
+          value={fmtP(population)} />
+        <MetricCell icon="💰" label="Funding"        accent="#D97706" highlighted={sortBy === 'funding'} last
+          value={fmtF(funding)} />
+      </div>
     </div>
   )
 }
@@ -143,6 +134,7 @@ export default function SuperAdminDashboard() {
   const [tab,              setTab]              = useState('overview')
   const [tableMode,        setTableMode]        = useState('country')
   const [topN,             setTopN]             = useState(5)
+  const [sortBy,           setSortBy]           = useState('outbreaks')
 
   const allYearsSelected    = selectedYears.length    === YEARS.length
   const allRegionsSelected  = selectedRegions.length  === SUBREGIONS.length
@@ -325,24 +317,26 @@ export default function SuperAdminDashboard() {
     })
   }, [activeCountries, selectedYears, allYearsSelected])
 
-  const cmpOutbreaks  = useMemo(() =>
-    [...countryComparison].sort((a, b) => b.outbreaks - a.outbreaks)
-  , [countryComparison])
+  // Merged per-country dataset: all 5 indicators in one array
+  const countryRankings = useMemo(() => {
+    const labMap = Object.fromEntries(labsByCountry.map(l => [l.iso3, l]))
+    return countryComparison.map(c => ({
+      ...c,
+      total_public_labs:        labMap[c.iso3]?.total_public_labs        ?? null,
+      labs_iso15189_accredited: labMap[c.iso3]?.labs_iso15189_accredited ?? null,
+      accreditation_pct:        labMap[c.iso3]?.accreditation_pct        ?? null,
+    }))
+  }, [countryComparison, labsByCountry])
 
-  const cmpWorkforce  = useMemo(() =>
-    [...countryComparison].filter(c => c.epidemiologists != null)
-      .sort((a, b) => b.epidemiologists - a.epidemiologists)
-  , [countryComparison])
+  const SORT_KEYS = {
+    outbreaks: 'outbreaks', labs: 'total_public_labs',
+    workforce: 'epidemiologists', population: 'population', funding: 'funding',
+  }
 
-  const cmpPopulation = useMemo(() =>
-    [...countryComparison].filter(c => c.population != null)
-      .sort((a, b) => b.population - a.population)
-  , [countryComparison])
-
-  const cmpFunding    = useMemo(() =>
-    [...countryComparison].filter(c => c.funding != null)
-      .sort((a, b) => b.funding - a.funding)
-  , [countryComparison])
+  const sortedRankings = useMemo(() => {
+    const key = SORT_KEYS[sortBy] || 'outbreaks'
+    return [...countryRankings].sort((a, b) => (b[key] ?? -1) - (a[key] ?? -1))
+  }, [countryRankings, sortBy])
 
   // Region-level aggregates (only selected regions)
   const bySubregion = useMemo(() => {
@@ -656,79 +650,80 @@ export default function SuperAdminDashboard() {
                 </section>
               )}
 
-              {/* ── Top Countries by Indicator ── */}
+              {/* ── Country Rankings ── */}
               <section className="section">
                 <div className="card" style={{ padding: '20px 24px' }}>
 
-                  {/* Header + Top-N filter */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+                  {/* Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
                     <div>
-                      <h2 className="card-title" style={{ marginBottom: 2 }}>Top Countries by Indicator — {yLabel}</h2>
+                      <h2 className="card-title" style={{ marginBottom: 2 }}>Country Rankings — {yLabel}</h2>
                       <p style={{ fontSize: 12, color: '#6B7C93', margin: 0 }}>
-                        Each card is coloured by region · {filterDesc}
+                        Each row shows all key indicators per country · {filterDesc}
                       </p>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 16 }}>
-                      <span style={{ fontSize: 12, color: '#6B7C93' }}>Show top:</span>
-                      {[5, 10, 15, 20].map(n => (
-                        <button
-                          key={n}
-                          onClick={() => setTopN(n)}
-                          style={{
-                            padding: '5px 14px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+                      {/* Sort by */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 11, color: '#6B7C93', fontWeight: 600 }}>Sort by:</span>
+                        {[
+                          { key: 'outbreaks',  label: '⚠️ Outbreaks',  accent: '#C00000' },
+                          { key: 'labs',       label: '🔬 Labs',        accent: '#0071BC' },
+                          { key: 'workforce',  label: '🩺 Workforce',   accent: '#059669' },
+                          { key: 'population', label: '👥 Population',  accent: '#7B2D8B' },
+                          { key: 'funding',    label: '💰 Funding',     accent: '#D97706' },
+                        ].map(({ key, label, accent }) => (
+                          <button key={key} onClick={() => setSortBy(key)} style={{
+                            padding: '5px 12px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+                            border: '1.5px solid', cursor: 'pointer',
+                            borderColor: sortBy === key ? accent : '#D1DBE8',
+                            background:  sortBy === key ? accent : '#fff',
+                            color:       sortBy === key ? '#fff' : '#6B7C93',
+                          }}>{label}</button>
+                        ))}
+                      </div>
+                      {/* Show N */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 11, color: '#6B7C93', fontWeight: 600 }}>Show:</span>
+                        {[5, 10, 15, 20].map(n => (
+                          <button key={n} onClick={() => setTopN(n)} style={{
+                            padding: '5px 12px', borderRadius: 7, fontSize: 11, fontWeight: 600,
                             border: '1.5px solid', cursor: 'pointer',
                             borderColor: topN === n ? '#0071BC' : '#D1DBE8',
                             background:  topN === n ? '#0071BC' : '#fff',
                             color:       topN === n ? '#fff'    : '#6B7C93',
-                          }}
-                        >
-                          {n}
-                        </button>
-                      ))}
+                          }}>{n}</button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
-                  <TopRow
-                    label="Outbreaks" icon="⚠️" accent="#C00000"
-                    subtitle="total outbreak events — highest to lowest"
-                    data={cmpOutbreaks} sliceN={topN}
-                    valueKey="outbreaks" formatValue={v => String(v ?? 0)}
-                  />
-                  <TopRow
-                    label="Public Labs" icon="🔬" accent="#0071BC"
-                    subtitle="total public labs — highest to lowest"
-                    data={labsByCountry} sliceN={topN}
-                    valueKey="total_public_labs" formatValue={v => String(v ?? 0)}
-                  />
-                  <TopRow
-                    label="Health Workforce" icon="🩺" accent="#059669"
-                    subtitle="epidemiologists — highest to lowest"
-                    data={cmpWorkforce} sliceN={topN}
-                    valueKey="epidemiologists" formatValue={v => v?.toLocaleString() ?? '—'}
-                  />
-                  <TopRow
-                    label="Population" icon="👥" accent="#7B2D8B"
-                    subtitle="total population — highest to lowest"
-                    data={cmpPopulation} sliceN={topN}
-                    valueKey="population"
-                    formatValue={v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v ? `${(v / 1_000).toFixed(0)}k` : '—'}
-                  />
-                  <TopRow
-                    label="Funding" icon="💰" accent="#D97706"
-                    subtitle="total health funding — highest to lowest"
-                    data={cmpFunding} sliceN={topN}
-                    valueKey="funding" formatValue={v => v ? `$${(v / 1_000_000).toFixed(1)}M` : '—'}
-                  />
-
                   {/* Region legend */}
-                  <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', paddingTop: 4 }}>
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
                     {Object.entries(REGION_COLORS).map(([r, col]) => (
-                      <span key={r} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#1A2B4A' }}>
-                        <span style={{ width: 12, height: 12, borderRadius: 3, background: col, display: 'inline-block' }} />
+                      <span key={r} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#1A2B4A' }}>
+                        <span style={{ width: 10, height: 10, borderRadius: 2, background: col, display: 'inline-block' }} />
                         {r} Africa
                       </span>
                     ))}
                   </div>
+
+                  {/* Country rows */}
+                  {sortedRankings.length === 0 ? (
+                    <p style={{ fontSize: 13, color: '#94a3b8' }}>No data for selected filters.</p>
+                  ) : (
+                    sortedRankings.slice(0, topN).map((c, i) => (
+                      <CountryRankRow
+                        key={c.iso3}
+                        rank={i + 1}
+                        country={c.country}
+                        iso3={c.iso3}
+                        subregion={c.subregion}
+                        data={c}
+                        sortBy={sortBy}
+                      />
+                    ))
+                  )}
                 </div>
               </section>
 
