@@ -188,7 +188,7 @@ export default function SuperAdminDashboard() {
   const [selectedDiseases, setSelectedDiseases] = useState([...ALL_DISEASES])
   const [tab,              setTab]              = useState('overview')
   const [tableMode,        setTableMode]        = useState('country')
-  const [topN,             setTopN]             = useState(5)
+  const [topN,             setTopN]             = useState(10)
   const [sortBy,           setSortBy]           = useState('outbreaks')
   const [selectedSituations, setSelectedSituations] = useState([...SITUATION_LEVELS])
 
@@ -550,63 +550,6 @@ export default function SuperAdminDashboard() {
           {/* ── OVERVIEW TAB ── */}
           {tab === 'overview' && (
             <>
-              <section className="section">
-                <div className="kpi-grid">
-                  <div className="kpi-card" style={{ borderTop: '4px solid #0071BC', background: '#EBF5FF' }}>
-                    <div className="kpi-card-header"><span className="kpi-title">Total Cases (AFRO)</span></div>
-                    <div className="kpi-value" style={{ color: '#0071BC' }}>{afroTotals.totalCases.toLocaleString()}</div>
-                    <div className="kpi-subtitle">{filterDesc} · {yLabel}</div>
-                  </div>
-                  <div className="kpi-card" style={{ borderTop: '4px solid #C00000', background: '#FFF0F0' }}>
-                    <div className="kpi-card-header"><span className="kpi-title">Total Deaths (AFRO)</span></div>
-                    <div className="kpi-value" style={{ color: '#C00000' }}>{afroTotals.totalDeaths.toLocaleString()}</div>
-                    <div className="kpi-subtitle">{filterDesc} · {yLabel}</div>
-                  </div>
-                  <div className="kpi-card" style={{ borderTop: '4px solid #D97706', background: '#FFF8ED' }}>
-                    <div className="kpi-card-header"><span className="kpi-title">Total Outbreaks</span></div>
-                    <div className="kpi-value" style={{ color: '#D97706' }}>{afroTotals.totalObs}</div>
-                    <div className="kpi-subtitle">{yLabel}</div>
-                  </div>
-                  <div className="kpi-card" style={{ borderTop: '4px solid #7B2D8B', background: '#F5F0FF' }}>
-                    <div className="kpi-card-header"><span className="kpi-title">Overall CFR</span></div>
-                    <div className="kpi-value" style={{ color: '#7B2D8B' }}>
-                      {afroTotals.cfr !== '—' ? `${afroTotals.cfr}%` : '—'}
-                    </div>
-                    <div className="kpi-subtitle">Deaths / Cases · {yLabel}</div>
-                  </div>
-                </div>
-              </section>
-
-              <section className="section">
-                <h2 className="section-heading">Region Summary</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-                  {bySubregion.map(sub => (
-                    <div
-                      key={sub.name}
-                      className="kpi-card"
-                      style={{ borderLeft: `4px solid ${REGION_COLORS[sub.name]}`, borderTop: 'none', cursor: 'pointer' }}
-                      onClick={() => setTab('table')}
-                    >
-                      <div className="kpi-card-header">
-                        <span className="kpi-title" style={{ color: REGION_COLORS[sub.name] }}>{sub.name} Africa</span>
-                        <span style={{ fontSize: 11, color: '#6B7C93' }}>{sub.countries} countries</span>
-                      </div>
-                      <div className="kpi-value" style={{ fontSize: 22, color: REGION_COLORS[sub.name] }}>
-                        {sub.totalCases.toLocaleString()}
-                      </div>
-                      <div className="kpi-subtitle">
-                        cases &nbsp;·&nbsp; {sub.totalDeaths.toLocaleString()} deaths
-                      </div>
-                      <div style={{ marginTop: 8, fontSize: 11, color: REGION_COLORS[sub.name], opacity: 0.8 }}>
-                        Click to view country detail →
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-
-
               {/* ── Country Rankings ── */}
               <section className="section">
                 <div className="card" style={{ padding: '20px 24px' }}>
@@ -653,15 +596,21 @@ export default function SuperAdminDashboard() {
                       {/* Show N */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontSize: 11, color: '#6B7C93', fontWeight: 600 }}>Show:</span>
-                        {[5, 10, 15, 20].map(n => (
-                          <button key={n} onClick={() => setTopN(n)} style={{
-                            padding: '5px 12px', borderRadius: 7, fontSize: 11, fontWeight: 600,
-                            border: '1.5px solid', cursor: 'pointer',
-                            borderColor: topN === n ? '#0071BC' : '#D1DBE8',
-                            background:  topN === n ? '#0071BC' : '#fff',
-                            color:       topN === n ? '#fff'    : '#6B7C93',
-                          }}>{n}</button>
-                        ))}
+                        <select
+                          value={topN ?? 'all'}
+                          onChange={e => setTopN(e.target.value === 'all' ? null : Number(e.target.value))}
+                          style={{
+                            padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+                            border: '1.5px solid #D1DBE8', background: '#fff', color: '#1A2B4A',
+                            cursor: 'pointer', outline: 'none',
+                          }}
+                        >
+                          <option value="all">All Countries</option>
+                          <option value="5">Top 5</option>
+                          <option value="10">Top 10</option>
+                          <option value="15">Top 15</option>
+                          <option value="20">Top 20</option>
+                        </select>
                       </div>
                     </div>
                   </div>
@@ -680,7 +629,7 @@ export default function SuperAdminDashboard() {
                   {sortedRankings.length === 0 ? (
                     <p style={{ fontSize: 13, color: '#94a3b8' }}>No data for selected filters.</p>
                   ) : (
-                    sortedRankings.slice(0, topN).map((c, i) => (
+                    (topN === null ? sortedRankings : sortedRankings.slice(0, topN)).map((c, i) => (
                       <CountryRankRow
                         key={c.iso3}
                         rank={i + 1}
@@ -692,6 +641,35 @@ export default function SuperAdminDashboard() {
                       />
                     ))
                   )}
+                </div>
+              </section>
+
+              {/* ── Region Summary ── */}
+              <section className="section">
+                <h2 className="section-heading">Region Summary</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+                  {bySubregion.map(sub => (
+                    <div
+                      key={sub.name}
+                      className="kpi-card"
+                      style={{ borderLeft: `4px solid ${REGION_COLORS[sub.name]}`, borderTop: 'none', cursor: 'pointer' }}
+                      onClick={() => setTab('table')}
+                    >
+                      <div className="kpi-card-header">
+                        <span className="kpi-title" style={{ color: REGION_COLORS[sub.name] }}>{sub.name} Africa</span>
+                        <span style={{ fontSize: 11, color: '#6B7C93' }}>{sub.countries} countries</span>
+                      </div>
+                      <div className="kpi-value" style={{ fontSize: 22, color: REGION_COLORS[sub.name] }}>
+                        {sub.totalCases.toLocaleString()}
+                      </div>
+                      <div className="kpi-subtitle">
+                        cases &nbsp;·&nbsp; {sub.totalDeaths.toLocaleString()} deaths
+                      </div>
+                      <div style={{ marginTop: 8, fontSize: 11, color: REGION_COLORS[sub.name], opacity: 0.8 }}>
+                        Click to view country detail →
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </section>
 

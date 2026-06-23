@@ -115,6 +115,7 @@ export default function RegionalDashboard() {
   const totalCases  = overview.reduce((s, c) => s + c.totalCases,    0)
   const totalDeaths = overview.reduce((s, c) => s + c.totalDeaths,   0)
   const totalObs    = overview.reduce((s, c) => s + c.outbreakCount, 0)
+  const overallCFR  = totalCases > 0 ? (totalDeaths / totalCases) * 100 : null
 
   const countryLabel = allCountriesSelected
     ? 'All countries'
@@ -231,7 +232,7 @@ export default function RegionalDashboard() {
 
           {/* KPIs */}
           <section className="section">
-            <div className="kpi-grid kpi-grid-3">
+            <div className="kpi-grid kpi-grid-4">
               <div className="kpi-card" style={{ borderTop: '4px solid #0071BC', background: '#EBF5FF' }}>
                 <div className="kpi-card-header"><span className="kpi-title">Total Cases</span></div>
                 <div className="kpi-value" style={{ color: '#0071BC' }}>{totalCases.toLocaleString()}</div>
@@ -246,6 +247,13 @@ export default function RegionalDashboard() {
                 <div className="kpi-card-header"><span className="kpi-title">Total Outbreaks</span></div>
                 <div className="kpi-value" style={{ color: '#D97706' }}>{totalObs}</div>
                 <div className="kpi-subtitle">Recorded in {yearLabel}</div>
+              </div>
+              <div className="kpi-card" style={{ borderTop: '4px solid #7B2D8B', background: '#F8F0FF' }}>
+                <div className="kpi-card-header"><span className="kpi-title">Overall CFR</span></div>
+                <div className="kpi-value" style={{ color: '#7B2D8B' }}>
+                  {overallCFR != null ? `${overallCFR.toFixed(2)}%` : '—'}
+                </div>
+                <div className="kpi-subtitle">Case fatality rate · {diseaseSubtitle}</div>
               </div>
             </div>
           </section>
