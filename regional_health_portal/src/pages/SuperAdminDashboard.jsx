@@ -188,7 +188,7 @@ export default function SuperAdminDashboard() {
   const [selectedDiseases, setSelectedDiseases] = useState([...ALL_DISEASES])
   const [tab,              setTab]              = useState('overview')
   const [tableMode,        setTableMode]        = useState('country')
-  const [topN,             setTopN]             = useState(5)
+  const [topN,             setTopN]             = useState(10)
   const [sortBy,           setSortBy]           = useState('outbreaks')
   const [selectedSituations, setSelectedSituations] = useState([...SITUATION_LEVELS])
 
@@ -596,15 +596,21 @@ export default function SuperAdminDashboard() {
                       {/* Show N */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontSize: 11, color: '#6B7C93', fontWeight: 600 }}>Show:</span>
-                        {[5, 10, 15, 20].map(n => (
-                          <button key={n} onClick={() => setTopN(n)} style={{
-                            padding: '5px 12px', borderRadius: 7, fontSize: 11, fontWeight: 600,
-                            border: '1.5px solid', cursor: 'pointer',
-                            borderColor: topN === n ? '#0071BC' : '#D1DBE8',
-                            background:  topN === n ? '#0071BC' : '#fff',
-                            color:       topN === n ? '#fff'    : '#6B7C93',
-                          }}>{n}</button>
-                        ))}
+                        <select
+                          value={topN ?? 'all'}
+                          onChange={e => setTopN(e.target.value === 'all' ? null : Number(e.target.value))}
+                          style={{
+                            padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+                            border: '1.5px solid #D1DBE8', background: '#fff', color: '#1A2B4A',
+                            cursor: 'pointer', outline: 'none',
+                          }}
+                        >
+                          <option value="all">All Countries</option>
+                          <option value="5">Top 5</option>
+                          <option value="10">Top 10</option>
+                          <option value="15">Top 15</option>
+                          <option value="20">Top 20</option>
+                        </select>
                       </div>
                     </div>
                   </div>
@@ -623,7 +629,7 @@ export default function SuperAdminDashboard() {
                   {sortedRankings.length === 0 ? (
                     <p style={{ fontSize: 13, color: '#94a3b8' }}>No data for selected filters.</p>
                   ) : (
-                    sortedRankings.slice(0, topN).map((c, i) => (
+                    (topN === null ? sortedRankings : sortedRankings.slice(0, topN)).map((c, i) => (
                       <CountryRankRow
                         key={c.iso3}
                         rank={i + 1}
