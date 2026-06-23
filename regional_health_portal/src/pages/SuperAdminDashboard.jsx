@@ -27,6 +27,23 @@ const REGION_COLORS = {
   Southern: '#D97706',
 }
 
+const SITUATION_LEVELS = ['Minimal', 'Low', 'Moderate', 'Severe', 'Critical']
+const SITUATION_COLORS = {
+  Minimal:  '#059669',
+  Low:      '#84cc16',
+  Moderate: '#D97706',
+  Severe:   '#C00000',
+  Critical: '#7B1D1D',
+}
+
+function getSituation(outbreaks) {
+  if (!outbreaks || outbreaks <= 2)  return 'Minimal'
+  if (outbreaks <= 6)                return 'Low'
+  if (outbreaks <= 12)               return 'Moderate'
+  if (outbreaks <= 20)               return 'Severe'
+  return 'Critical'
+}
+
 const PRIORITY_LABEL = { 1: 'High', 2: 'Medium', 3: 'Standard' }
 const PRIORITY_COLOR = { 1: '#C00000', 2: '#D97706', 3: '#059669' }
 
@@ -103,6 +120,14 @@ function CountryRankRow({ rank, country, iso3, subregion, data, sortBy }) {
         }}>#{rank}</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: '#1A2B4A' }}>{country}</span>
         <span style={{ fontSize: 11, color: '#94a3b8' }}>{iso3}</span>
+        {data.situation && (
+          <span style={{
+            fontSize: 10, fontWeight: 700,
+            color: SITUATION_COLORS[data.situation],
+            background: SITUATION_COLORS[data.situation] + '18',
+            padding: '2px 8px', borderRadius: 99, flexShrink: 0,
+          }}>{data.situation}</span>
+        )}
         <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: regionCol, flexShrink: 0 }}>
           {subregion} Africa
         </span>
@@ -135,6 +160,7 @@ export default function SuperAdminDashboard() {
   const [tableMode,        setTableMode]        = useState('country')
   const [topN,             setTopN]             = useState(5)
   const [sortBy,           setSortBy]           = useState('outbreaks')
+  const [selectedSituations, setSelectedSituations] = useState([...SITUATION_LEVELS])
 
   const allYearsSelected    = selectedYears.length    === YEARS.length
   const allRegionsSelected  = selectedRegions.length  === SUBREGIONS.length
@@ -317,7 +343,7 @@ export default function SuperAdminDashboard() {
     })
   }, [activeCountries, selectedYears, allYearsSelected])
 
-  // Merged per-country dataset: all 5 indicators in one array
+  // Merged per-country dataset: all 5 indicators + derived situation level
   const countryRankings = useMemo(() => {
     const labMap = Object.fromEntries(labsByCountry.map(l => [l.iso3, l]))
     return countryComparison.map(c => ({
@@ -325,8 +351,16 @@ export default function SuperAdminDashboard() {
       total_public_labs:        labMap[c.iso3]?.total_public_labs        ?? null,
       labs_iso15189_accredited: labMap[c.iso3]?.labs_iso15189_accredited ?? null,
       accreditation_pct:        labMap[c.iso3]?.accreditation_pct        ?? null,
+      situation: getSituation(c.outbreaks),
     }))
   }, [countryComparison, labsByCountry])
+
+  const allSituationsSelected = selectedSituations.length === SITUATION_LEVELS.length
+
+  const filteredRankings = useMemo(() => {
+    if (allSituationsSelected) return countryRankings
+    return countryRankings.filter(c => selectedSituations.includes(c.situation))
+  }, [countryRankings, selectedSituations, allSituationsSelected])
 
   const SORT_KEYS = {
     outbreaks: 'outbreaks', labs: 'total_public_labs',
@@ -335,8 +369,8 @@ export default function SuperAdminDashboard() {
 
   const sortedRankings = useMemo(() => {
     const key = SORT_KEYS[sortBy] || 'outbreaks'
-    return [...countryRankings].sort((a, b) => (b[key] ?? -1) - (a[key] ?? -1))
-  }, [countryRankings, sortBy])
+    return [...filteredRankings].sort((a, b) => (b[key] ?? -1) - (a[key] ?? -1))
+  }, [filteredRankings, sortBy])
 
   // Region-level aggregates (only selected regions)
   const bySubregion = useMemo(() => {
@@ -681,6 +715,17 @@ export default function SuperAdminDashboard() {
                             color:       sortBy === key ? '#fff' : '#6B7C93',
                           }}>{label}</button>
                         ))}
+                      </div>
+                      {/* Situation filter */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 11, color: '#6B7C93', fontWeight: 600 }}>Situation:</span>
+                        <MultiSelectDropdown
+                          options={SITUATION_LEVELS.map(s => ({ value: s, label: s }))}
+                          selected={selectedSituations}
+                          onChange={setSelectedSituations}
+                          placeholder="All situations"
+                          allLabel="All Situations"
+                        />
                       </div>
                       {/* Show N */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
