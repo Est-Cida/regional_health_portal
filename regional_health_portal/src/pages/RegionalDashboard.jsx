@@ -30,26 +30,30 @@ const MAP_METRICS = [
 export default function RegionalDashboard() {
   const { user } = useAuth()
 
-  // Default selection: super_admin starts with all regions, others start with their own
-  const defaultSubregions = user.role === 'super_admin'
-    ? [...SUBREGIONS]
-    : [user.subregion].filter(Boolean)
+  // Regions this user is permitted to see — super_admin gets all, others only their own
+  const allowedRegions = useMemo(
+    () => user.role === 'super_admin' ? [...SUBREGIONS] : [user.subregion].filter(Boolean),
+    [user.role, user.subregion],
+  )
 
-  const [selectedSubregions, setSelectedSubregions] = useState(defaultSubregions)
-  const [selectedYear,       setSelectedYear]       = useState(2024)
-  const [selectedDiseases,   setSelectedDiseases]   = useState([...ALL_DISEASES])
-  const [mapMetric,          setMapMetric]          = useState('totalCases')
+  const [selectedSubregions, setSelectedSubregions] = useState(
+    () => user.role === 'super_admin' ? [...SUBREGIONS] : [user.subregion].filter(Boolean),
+  )
+  const [selectedYear,     setSelectedYear]     = useState(2024)
+  const [selectedDiseases, setSelectedDiseases] = useState([...ALL_DISEASES])
+  const [mapMetric,        setMapMetric]        = useState('totalCases')
 
-  const allSubregionsSelected = selectedSubregions.length === SUBREGIONS.length
+  // "All selected" is relative to what the user is allowed to see
+  const allSubregionsSelected = selectedSubregions.length === allowedRegions.length
   const allDiseasesSelected   = selectedDiseases.length   === ALL_DISEASES.length
   const yearLabel = selectedYear === 'all' ? 'All Years' : selectedYear
 
-  // Countries available under current region selection
+  // Countries pool is capped to allowedRegions — regional_admin cannot cross into other regions
   const availableCountries = useMemo(() => {
     const activeSubs = (allSubregionsSelected || !selectedSubregions.length)
-      ? SUBREGIONS : selectedSubregions
+      ? allowedRegions : selectedSubregions
     return activeSubs.flatMap(sub => getCountriesBySubregion(sub))
-  }, [selectedSubregions, allSubregionsSelected])
+  }, [selectedSubregions, allSubregionsSelected, allowedRegions])
 
   const [selectedCountries, setSelectedCountries] = useState(
     () => availableCountries.map(c => c.iso_3_code)
@@ -157,7 +161,7 @@ export default function RegionalDashboard() {
     return result
   }, [availableCountries, selectedYear])
 
-  const mapSubregion = selectedSubregions[0] ?? SUBREGIONS[0]
+  const mapSubregion = selectedSubregions[0] ?? allowedRegions[0]
 
   return (
     <div className="app-layout">
@@ -176,16 +180,18 @@ export default function RegionalDashboard() {
               </p>
             </div>
             <div className="page-header-controls">
-              <div className="control-group">
-                <label className="control-label">Region</label>
-                <MultiSelectDropdown
-                  options={SUBREGIONS.map(s => ({ value: s, label: `${s} Africa` }))}
-                  selected={selectedSubregions}
-                  onChange={setSelectedSubregions}
-                  placeholder="Select region…"
-                  allLabel="All Regions"
-                />
-              </div>
+              {user.role === 'super_admin' && (
+                <div className="control-group">
+                  <label className="control-label">Region</label>
+                  <MultiSelectDropdown
+                    options={SUBREGIONS.map(s => ({ value: s, label: `${s} Africa` }))}
+                    selected={selectedSubregions}
+                    onChange={setSelectedSubregions}
+                    placeholder="Select region…"
+                    allLabel="All Regions"
+                  />
+                </div>
+              )}
               <div className="control-group">
                 <label className="control-label">Country</label>
                 <MultiSelectDropdown
