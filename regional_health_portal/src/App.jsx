@@ -7,6 +7,7 @@ import LoginPage            from './pages/LoginPage'
 import RegionalDashboard    from './pages/RegionalDashboard'
 import SuperAdminDashboard  from './pages/SuperAdminDashboard'
 import UserManagement       from './pages/UserManagement'
+import ProfileSettings      from './pages/ProfileSettings'
 
 // Country nested layout + sub-pages
 import CountryLayout       from './pages/country/CountryLayout'
@@ -72,6 +73,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['super_admin']}>
             <UserManagement />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute allowedRoles={['country_admin', 'regional_admin', 'super_admin']}>
+            <ProfileSettings />
           </ProtectedRoute>
         }
       />

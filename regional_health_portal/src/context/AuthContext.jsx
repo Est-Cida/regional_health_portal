@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 
 const AuthContext = createContext(null)
 
@@ -59,8 +59,18 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(KEY)
   }, [])
 
+  // Merge changes into the live user object (used by ProfileSettings after a save)
+  const updateUser = useCallback((patch) => {
+    setUser(u => u ? { ...u, ...patch } : u)
+  }, [])
+
+  const value = useMemo(
+    () => ({ user, login, logout, updateUser, loading }),
+    [user, login, logout, updateUser, loading],
+  )
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )
