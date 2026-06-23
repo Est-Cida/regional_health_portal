@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Layout/Navbar'
 import Sidebar from '../components/Layout/Sidebar'
@@ -30,13 +30,13 @@ const PRIORITY_LABEL = { 1: 'High', 2: 'Medium', 3: 'Standard' }
 const PRIORITY_COLOR = { 1: '#C00000', 2: '#D97706', 3: '#059669' }
 
 const DISEASE_COLORS = {
-  'Cholera':                    '#0071BC',
-  'Measles':                    '#F7941D',
-  'Meningitis':                 '#7B2D8B',
-  'Yellow fever':               '#D4A017',
-  'Lassa fever':                '#C00000',
-  'Viral haemorrhagic fever':   '#8B0000',
-  'Polio (cVDPV)':              '#059669',
+  'Cholera':                  '#0071BC',
+  'Measles':                  '#F7941D',
+  'Meningitis':               '#7B2D8B',
+  'Yellow fever':             '#D4A017',
+  'Lassa fever':              '#C00000',
+  'Viral haemorrhagic fever': '#8B0000',
+  'Polio (cVDPV)':            '#059669',
 }
 
 const fmtNum  = v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v
@@ -50,29 +50,59 @@ const RAW_LAB          = getRawLabCapacity()
 const RAW_WORKFORCE    = getRawWorkforce()
 const RAW_FUNDING      = getRawFunding()
 
-function yearLabel(selectedYears) {
-  if (!selectedYears.length || selectedYears.length === YEARS.length) return 'All Years'
-  if (selectedYears.length === 1) return String(selectedYears[0])
-  return `${selectedYears.length} Years`
+function fmtYearLabel(years) {
+  if (!years.length || years.length === YEARS.length) return 'All Years'
+  if (years.length === 1) return String(years[0])
+  return `${years.length} Years`
 }
 
 export default function SuperAdminDashboard() {
   const navigate = useNavigate()
-  const [selectedYears,   setSelectedYears]   = useState([2024])
-  const [filterSubregion, setFilterSubregion] = useState('All')
-  const [tab,             setTab]             = useState('overview')
-  const [tableMode,       setTableMode]       = useState('country')  // 'country' | 'disease'
 
-  const allYearsSelected = selectedYears.length === YEARS.length
+  const [selectedYears,    setSelectedYears]    = useState([2024])
+  const [selectedRegions,  setSelectedRegions]  = useState([...SUBREGIONS])
+  const [selectedDiseases, setSelectedDiseases] = useState([...ALL_DISEASES])
+  const [tab,              setTab]              = useState('overview')
+  const [tableMode,        setTableMode]        = useState('country')
 
-  // Per-country multi-indicator aggregate across selected years
+  const allYearsSelected    = selectedYears.length    === YEARS.length
+  const allRegionsSelected  = selectedRegions.length  === SUBREGIONS.length
+  const allDiseasesSelected = selectedDiseases.length === ALL_DISEASES.length
+
+  // Country pool scoped to selected regions
+  const availableCountries = useMemo(() =>
+    allRegionsSelected
+      ? ALL_COUNTRIES
+      : ALL_COUNTRIES.filter(c => selectedRegions.includes(c.afro_subregion))
+  , [selectedRegions, allRegionsSelected])
+
+  const [selectedCountries, setSelectedCountries] = useState(
+    () => ALL_COUNTRIES.map(c => c.iso_3_code)
+  )
+
+  // Reset country selection when region filter changes
+  useEffect(() => {
+    setSelectedCountries(availableCountries.map(c => c.iso_3_code))
+  }, [availableCountries])
+
+  const allCountriesSelected = selectedCountries.length === availableCountries.length
+
+  // Final active country list (region ∩ country filters)
+  const activeCountries = useMemo(() =>
+    allCountriesSelected
+      ? availableCountries
+      : availableCountries.filter(c => selectedCountries.includes(c.iso_3_code))
+  , [availableCountries, selectedCountries, allCountriesSelected])
+
+  // Per-country multi-indicator aggregate
   const countryData = useMemo(() => {
-    return ALL_COUNTRIES.map(c => {
+    return activeCountries.map(c => {
       const iso3 = c.iso_3_code
 
       const survRows = RAW_SURVEILLANCE.filter(s =>
         s.iso_3_code === iso3 &&
-        (allYearsSelected || selectedYears.includes(s.year))
+        (allYearsSelected    || selectedYears.includes(s.year)) &&
+        (allDiseasesSelected || selectedDiseases.includes(s.disease))
       )
       const obsRows  = RAW_OUTBREAKS.filter(o =>
         o.iso_3_code === iso3 &&
@@ -114,15 +144,16 @@ export default function SuperAdminDashboard() {
         totalFunding:  validFund.length ? validFund.reduce((s, f) => s + (f.total_funding_usd     || 0), 0) : null,
       }
     })
-  }, [selectedYears, allYearsSelected])
+  }, [activeCountries, selectedYears, allYearsSelected, selectedDiseases, allDiseasesSelected])
 
   // Per-country disease-level breakdown
   const countryDiseaseData = useMemo(() => {
-    return ALL_COUNTRIES.map(c => {
+    return activeCountries.map(c => {
       const iso3 = c.iso_3_code
       const survRows = RAW_SURVEILLANCE.filter(s =>
         s.iso_3_code === iso3 &&
-        (allYearsSelected || selectedYears.includes(s.year))
+        (allYearsSelected    || selectedYears.includes(s.year)) &&
+        (allDiseasesSelected || selectedDiseases.includes(s.disease))
       )
       const byDisease = {}
       survRows.forEach(r => {
@@ -145,9 +176,9 @@ export default function SuperAdminDashboard() {
         diseases,
       }
     })
-  }, [selectedYears, allYearsSelected])
+  }, [activeCountries, selectedYears, allYearsSelected, selectedDiseases, allDiseasesSelected])
 
-  // AFRO-level KPI totals
+  // KPI totals over active data
   const afroTotals = useMemo(() => {
     const totalCases  = countryData.reduce((s, c) => s + c.totalCases,  0)
     const totalDeaths = countryData.reduce((s, c) => s + c.totalDeaths, 0)
@@ -159,9 +190,10 @@ export default function SuperAdminDashboard() {
     }
   }, [countryData])
 
-  // Sub-region aggregates for charts
-  const bySubregion = useMemo(() =>
-    SUBREGIONS.map(sub => {
+  // Region-level aggregates (only selected regions)
+  const bySubregion = useMemo(() => {
+    const activeRegions = allRegionsSelected ? SUBREGIONS : selectedRegions
+    return activeRegions.map(sub => {
       const rows = countryData.filter(c => c.subregion === sub)
       return {
         name:        sub,
@@ -169,16 +201,14 @@ export default function SuperAdminDashboard() {
         totalDeaths: rows.reduce((s, c) => s + c.totalDeaths, 0),
         countries:   rows.length,
       }
-    }), [countryData])
+    })
+  }, [countryData, selectedRegions, allRegionsSelected])
 
-  // Countries grouped for the Country-mode table
+  // Table: country totals grouped by region
   const grouped = useMemo(() => {
-    const base = filterSubregion === 'All'
-      ? countryData
-      : countryData.filter(c => c.subregion === filterSubregion)
-
-    return SUBREGIONS.map(sub => {
-      const rows = base.filter(c => c.subregion === sub).sort((a, b) => b.totalCases - a.totalCases)
+    const activeRegions = allRegionsSelected ? SUBREGIONS : selectedRegions
+    return activeRegions.map(sub => {
+      const rows = countryData.filter(c => c.subregion === sub).sort((a, b) => b.totalCases - a.totalCases)
       if (!rows.length) return null
       const validLab  = rows.filter(c => c.avgLabAccred != null)
       const validEpi  = rows.filter(c => c.totalEpi     != null)
@@ -197,22 +227,26 @@ export default function SuperAdminDashboard() {
         },
       }
     }).filter(Boolean)
-  }, [countryData, filterSubregion])
+  }, [countryData, selectedRegions, allRegionsSelected])
 
-  // Countries grouped for the Disease-mode table
+  // Table: disease breakdown grouped by region
   const groupedDisease = useMemo(() => {
-    const base = filterSubregion === 'All'
-      ? countryDiseaseData
-      : countryDiseaseData.filter(c => c.subregion === filterSubregion)
-
-    return SUBREGIONS.map(sub => {
-      const rows = base.filter(c => c.subregion === sub).sort((a, b) => b.totalCases - a.totalCases)
+    const activeRegions = allRegionsSelected ? SUBREGIONS : selectedRegions
+    return activeRegions.map(sub => {
+      const rows = countryDiseaseData.filter(c => c.subregion === sub).sort((a, b) => b.totalCases - a.totalCases)
       if (!rows.length) return null
       return { subregion: sub, rows }
     }).filter(Boolean)
-  }, [countryDiseaseData, filterSubregion])
+  }, [countryDiseaseData, selectedRegions, allRegionsSelected])
 
-  const yLabel = yearLabel(selectedYears)
+  const yLabel = fmtYearLabel(selectedYears)
+  const showAfroTotal = allRegionsSelected && allCountriesSelected
+
+  const filterDesc = [
+    allRegionsSelected   ? 'all regions'   : `${selectedRegions.length} region${selectedRegions.length !== 1 ? 's' : ''}`,
+    allCountriesSelected ? 'all countries' : `${selectedCountries.length} countr${selectedCountries.length !== 1 ? 'ies' : 'y'}`,
+    allDiseasesSelected  ? 'all diseases'  : `${selectedDiseases.length} disease${selectedDiseases.length !== 1 ? 's' : ''}`,
+  ].join(' · ')
 
   return (
     <div className="app-layout">
@@ -227,10 +261,40 @@ export default function SuperAdminDashboard() {
               <div className="page-breadcrumb">Super Admin</div>
               <h1 className="page-title">WHO AFRO — Pan-Regional Overview</h1>
               <p className="page-desc">
-                {ALL_COUNTRIES.length} countries across {SUBREGIONS.length} sub-regions &mdash; {yLabel}
+                {activeCountries.length} of {ALL_COUNTRIES.length} countries across {bySubregion.length} region{bySubregion.length !== 1 ? 's' : ''} — {yLabel}
               </p>
             </div>
             <div className="page-header-controls">
+              <div className="control-group">
+                <label className="control-label">Region</label>
+                <MultiSelectDropdown
+                  options={SUBREGIONS.map(s => ({ value: s, label: `${s} Africa` }))}
+                  selected={selectedRegions}
+                  onChange={setSelectedRegions}
+                  placeholder="Select region…"
+                  allLabel="All Regions"
+                />
+              </div>
+              <div className="control-group">
+                <label className="control-label">Country</label>
+                <MultiSelectDropdown
+                  options={availableCountries.map(c => ({ value: c.iso_3_code, label: c.country_name }))}
+                  selected={selectedCountries}
+                  onChange={setSelectedCountries}
+                  placeholder="Select country…"
+                  allLabel="All Countries"
+                />
+              </div>
+              <div className="control-group">
+                <label className="control-label">Disease</label>
+                <MultiSelectDropdown
+                  options={ALL_DISEASES.map(d => ({ value: d, label: d }))}
+                  selected={selectedDiseases}
+                  onChange={setSelectedDiseases}
+                  placeholder="Select disease…"
+                  allLabel="All Diseases"
+                />
+              </div>
               <div className="control-group">
                 <label className="control-label">Year</label>
                 <MultiSelectDropdown
@@ -268,12 +332,12 @@ export default function SuperAdminDashboard() {
                   <div className="kpi-card" style={{ borderTop: '4px solid #0071BC', background: '#EBF5FF' }}>
                     <div className="kpi-card-header"><span className="kpi-title">Total Cases (AFRO)</span></div>
                     <div className="kpi-value" style={{ color: '#0071BC' }}>{afroTotals.totalCases.toLocaleString()}</div>
-                    <div className="kpi-subtitle">All countries · all diseases · {yLabel}</div>
+                    <div className="kpi-subtitle">{filterDesc} · {yLabel}</div>
                   </div>
                   <div className="kpi-card" style={{ borderTop: '4px solid #C00000', background: '#FFF0F0' }}>
                     <div className="kpi-card-header"><span className="kpi-title">Total Deaths (AFRO)</span></div>
                     <div className="kpi-value" style={{ color: '#C00000' }}>{afroTotals.totalDeaths.toLocaleString()}</div>
-                    <div className="kpi-subtitle">All countries · all diseases · {yLabel}</div>
+                    <div className="kpi-subtitle">{filterDesc} · {yLabel}</div>
                   </div>
                   <div className="kpi-card" style={{ borderTop: '4px solid #D97706', background: '#FFF8ED' }}>
                     <div className="kpi-card-header"><span className="kpi-title">Total Outbreaks</span></div>
@@ -294,7 +358,7 @@ export default function SuperAdminDashboard() {
                 <div className="charts-grid">
                   <div className="card">
                     <div className="card-header">
-                      <h2 className="card-title">Cases &amp; Deaths by Sub-region — {yLabel}</h2>
+                      <h2 className="card-title">Cases &amp; Deaths by Region — {yLabel}</h2>
                     </div>
                     <ResponsiveContainer width="100%" height={260}>
                       <BarChart data={bySubregion} margin={{ top: 4, right: 24, left: 8, bottom: 4 }}>
@@ -315,7 +379,7 @@ export default function SuperAdminDashboard() {
 
                   <div className="card">
                     <div className="card-header">
-                      <h2 className="card-title">Case Share by Sub-region — {yLabel}</h2>
+                      <h2 className="card-title">Case Share by Region — {yLabel}</h2>
                     </div>
                     <ResponsiveContainer width="100%" height={260}>
                       <PieChart>
@@ -341,14 +405,14 @@ export default function SuperAdminDashboard() {
               </section>
 
               <section className="section">
-                <h2 className="section-heading">Sub-region Summary</h2>
+                <h2 className="section-heading">Region Summary</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
                   {bySubregion.map(sub => (
                     <div
                       key={sub.name}
                       className="kpi-card"
                       style={{ borderLeft: `4px solid ${REGION_COLORS[sub.name]}`, borderTop: 'none', cursor: 'pointer' }}
-                      onClick={() => { setFilterSubregion(sub.name); setTab('table') }}
+                      onClick={() => setTab('table')}
                     >
                       <div className="kpi-card-header">
                         <span className="kpi-title" style={{ color: REGION_COLORS[sub.name] }}>{sub.name} Africa</span>
@@ -376,10 +440,9 @@ export default function SuperAdminDashboard() {
               <div className="card">
                 <div className="card-header">
                   <h2 className="card-title">
-                    All AFRO Countries — {tableMode === 'disease' ? 'Disease Breakdown' : 'Multi-Indicator Summary'} — {yLabel}
+                    AFRO Countries — {tableMode === 'disease' ? 'Disease Breakdown' : 'Multi-Indicator Summary'} — {yLabel}
                   </h2>
-                  <div className="card-filters" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    {/* View mode toggle */}
+                  <div className="card-filters">
                     <div className="map-metric-toggle">
                       <button
                         className={`map-metric-btn${tableMode === 'country' ? ' active' : ''}`}
@@ -394,16 +457,6 @@ export default function SuperAdminDashboard() {
                         By Disease
                       </button>
                     </div>
-                    <select
-                      className="select-control select-sm"
-                      value={filterSubregion}
-                      onChange={e => setFilterSubregion(e.target.value)}
-                    >
-                      <option value="All">All Sub-regions</option>
-                      {SUBREGIONS.map(s => (
-                        <option key={s} value={s}>{s} Africa</option>
-                      ))}
-                    </select>
                   </div>
                 </div>
 
@@ -475,7 +528,7 @@ export default function SuperAdminDashboard() {
                             </tr>
                           </>
                         ))}
-                        {filterSubregion === 'All' && (
+                        {showAfroTotal && (
                           <tr style={{ background: '#1A2B4A', color: '#fff', fontWeight: 700 }}>
                             <td style={{ color: '#fff' }}>AFRO TOTAL</td>
                             <td></td>
@@ -511,7 +564,6 @@ export default function SuperAdminDashboard() {
                       <tbody>
                         {groupedDisease.map(({ subregion, rows }) => (
                           <>
-                            {/* Sub-region header */}
                             <tr
                               key={`dhdr-${subregion}`}
                               style={{ background: REGION_COLORS[subregion] + '18', borderLeft: `4px solid ${REGION_COLORS[subregion]}` }}
@@ -523,10 +575,8 @@ export default function SuperAdminDashboard() {
 
                             {rows.map(c => (
                               <>
-                                {/* Disease rows */}
                                 {c.diseases.map((d, i) => (
                                   <tr key={`${c.iso3}-${d.disease}`}>
-                                    {/* Country cell spans first disease row only */}
                                     {i === 0 ? (
                                       <td rowSpan={c.diseases.length} style={{ verticalAlign: 'top', paddingTop: 10, borderRight: '1px solid #E5EAF0' }}>
                                         <strong>{c.country_name}</strong>
@@ -558,7 +608,6 @@ export default function SuperAdminDashboard() {
                                   </tr>
                                 ))}
 
-                                {/* Country total row */}
                                 <tr key={`dtotal-${c.iso3}`} style={{ background: '#F8FAFC', fontWeight: 600, borderTop: '1px solid #D1DBE8' }}>
                                   <td style={{ paddingLeft: 20, color: '#1A2B4A' }}>{c.country_name} Total</td>
                                   <td></td>
@@ -574,7 +623,6 @@ export default function SuperAdminDashboard() {
                               </>
                             ))}
 
-                            {/* Sub-region disease subtotal */}
                             <tr
                               key={`dsub-${subregion}`}
                               style={{ background: REGION_COLORS[subregion] + '10', fontWeight: 700, borderTop: `2px solid ${REGION_COLORS[subregion]}` }}
@@ -589,8 +637,7 @@ export default function SuperAdminDashboard() {
                           </>
                         ))}
 
-                        {/* AFRO Grand Total */}
-                        {filterSubregion === 'All' && (
+                        {showAfroTotal && (
                           <tr style={{ background: '#1A2B4A', color: '#fff', fontWeight: 700 }}>
                             <td style={{ color: '#fff' }}>AFRO TOTAL</td>
                             <td></td>
