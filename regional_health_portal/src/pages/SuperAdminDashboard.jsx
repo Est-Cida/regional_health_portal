@@ -13,6 +13,7 @@ import {
   getRawLabCapacity,
   getRawWorkforce,
   getRawFunding,
+  getRawPopulation,
 } from '../data/dataService'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -49,6 +50,7 @@ const RAW_OUTBREAKS    = getRawOutbreaks()
 const RAW_LAB          = getRawLabCapacity()
 const RAW_WORKFORCE    = getRawWorkforce()
 const RAW_FUNDING      = getRawFunding()
+const RAW_POPULATION   = getRawPopulation()
 
 function fmtYearLabel(years) {
   if (!years.length || years.length === YEARS.length) return 'All Years'
@@ -209,6 +211,60 @@ export default function SuperAdminDashboard() {
     }).filter(Boolean).sort((a, b) => b.total_public_labs - a.total_public_labs)
   }, [activeCountries, selectedYears, allYearsSelected])
 
+  // Per-country multi-dimension comparison (for Country Analytics tab)
+  const countryComparison = useMemo(() => {
+    return activeCountries.map(c => {
+      const iso3 = c.iso_3_code
+
+      const obsRows  = RAW_OUTBREAKS.filter(o =>
+        o.iso_3_code === iso3 && (allYearsSelected || selectedYears.includes(o.year))
+      )
+      const wfRows   = RAW_WORKFORCE.filter(w =>
+        w.iso_3_code === iso3 && (allYearsSelected || selectedYears.includes(w.year))
+      )
+      const popRows  = RAW_POPULATION.filter(p =>
+        p.iso_3_code === iso3 && (allYearsSelected || selectedYears.includes(p.year))
+      )
+      const fundRows = RAW_FUNDING.filter(f =>
+        f.iso_3_code === iso3 && (allYearsSelected || selectedYears.includes(f.year))
+      )
+
+      const avg = (rows, key) => rows.length
+        ? Math.round(rows.reduce((s, r) => s + (Number(r[key]) || 0), 0) / rows.length)
+        : null
+
+      return {
+        country:         c.country_name,
+        iso3,
+        subregion:       c.afro_subregion,
+        outbreaks:       obsRows.length,
+        epidemiologists: avg(wfRows,   'epidemiologists_total'),
+        lab_technicians: avg(wfRows,   'lab_technicians_total'),
+        population:      avg(popRows,  'total_population'),
+        funding:         avg(fundRows, 'total_funding_usd'),
+      }
+    })
+  }, [activeCountries, selectedYears, allYearsSelected])
+
+  const cmpOutbreaks  = useMemo(() =>
+    [...countryComparison].sort((a, b) => b.outbreaks - a.outbreaks)
+  , [countryComparison])
+
+  const cmpWorkforce  = useMemo(() =>
+    [...countryComparison].filter(c => c.epidemiologists != null)
+      .sort((a, b) => b.epidemiologists - a.epidemiologists)
+  , [countryComparison])
+
+  const cmpPopulation = useMemo(() =>
+    [...countryComparison].filter(c => c.population != null)
+      .sort((a, b) => b.population - a.population)
+  , [countryComparison])
+
+  const cmpFunding    = useMemo(() =>
+    [...countryComparison].filter(c => c.funding != null)
+      .sort((a, b) => b.funding - a.funding)
+  , [countryComparison])
+
   // Region-level aggregates (only selected regions)
   const bySubregion = useMemo(() => {
     const activeRegions = allRegionsSelected ? SUBREGIONS : selectedRegions
@@ -330,8 +386,9 @@ export default function SuperAdminDashboard() {
           {/* Tabs */}
           <div className="page-tab-bar">
             {[
-              { key: 'overview', label: 'Overview'        },
-              { key: 'table',    label: 'Country Summary' },
+              { key: 'overview',   label: 'Overview'          },
+              { key: 'analytics', label: 'Country Analytics'  },
+              { key: 'table',      label: 'Country Summary'   },
             ].map(t => (
               <button
                 key={t.key}
@@ -498,6 +555,256 @@ export default function SuperAdminDashboard() {
                         <Legend verticalAlign="top" height={40} wrapperStyle={{ fontSize: 11, top: 0 }} />
                         <Bar dataKey="total_public_labs"        name="Total Public Labs"    fill="#0071BC" radius={[0, 4, 4, 0]} maxBarSize={14} />
                         <Bar dataKey="labs_iso15189_accredited" name="ISO 15189 Accredited" fill="#059669" radius={[0, 4, 4, 0]} maxBarSize={14} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+
+          {/* ── COUNTRY ANALYTICS TAB ── */}
+          {tab === 'analytics' && (
+            <>
+              <section className="section">
+                <div style={{
+                  background: '#F0F7FF', border: '1px solid #C7DCF5',
+                  borderRadius: 10, padding: '14px 20px',
+                  fontSize: 13, color: '#1A2B4A', lineHeight: 1.6,
+                }}>
+                  <strong>Country Rankings — {yLabel}</strong>
+                  &nbsp;·&nbsp; Each bar is coloured by region.
+                  Bars at the <strong>bottom</strong> of Workforce and Funding charts indicate countries that may need additional support.
+                  &nbsp;{filterDesc}.
+                </div>
+              </section>
+
+              {/* Outbreaks by Country */}
+              {cmpOutbreaks.length > 0 && (
+                <section className="section">
+                  <div className="card">
+                    <div className="card-header">
+                      <div>
+                        <h2 className="card-title">Outbreaks by Country — {yLabel}</h2>
+                        <span className="card-subtitle">Total outbreak events · highest to lowest</span>
+                      </div>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, color: '#C00000',
+                        background: '#FFF0F0', border: '1px solid #FCA5A5',
+                        borderRadius: 6, padding: '3px 10px',
+                      }}>
+                        ↑ High count = higher disease burden
+                      </span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={Math.max(260, cmpOutbreaks.length * 34) + 16}>
+                      <BarChart
+                        data={cmpOutbreaks}
+                        layout="vertical"
+                        margin={{ top: 8, right: 56, left: 4, bottom: 4 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
+                        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7C93' }} />
+                        <YAxis type="category" dataKey="country" width={175} tick={{ fontSize: 11, fill: '#1A2B4A' }} />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null
+                            const d = payload[0]?.payload
+                            return (
+                              <div className="chart-tooltip">
+                                <p className="tooltip-label">{d?.country} <span style={{ color: '#6B7C93' }}>({d?.iso3})</span></p>
+                                <p>Outbreaks: <strong>{d?.outbreaks}</strong></p>
+                                <p style={{ color: '#6B7C93', fontSize: 11 }}>{d?.subregion} Africa</p>
+                              </div>
+                            )
+                          }}
+                        />
+                        <Bar dataKey="outbreaks" name="Outbreaks" maxBarSize={18} radius={[0, 4, 4, 0]}
+                          label={{ position: 'right', fontSize: 11, fill: '#1A2B4A', formatter: v => v || '' }}
+                        >
+                          {cmpOutbreaks.map(c => (
+                            <Cell key={c.iso3} fill={REGION_COLORS[c.subregion] || '#888'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', padding: '8px 16px 16px', borderTop: '1px solid #E5EAF0' }}>
+                      {Object.entries(REGION_COLORS).map(([r, col]) => (
+                        <span key={r} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#1A2B4A' }}>
+                          <span style={{ width: 12, height: 12, borderRadius: 3, background: col, display: 'inline-block' }} />
+                          {r} Africa
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              {/* Health Workforce by Country */}
+              {cmpWorkforce.length > 0 && (
+                <section className="section">
+                  <div className="card">
+                    <div className="card-header">
+                      <div>
+                        <h2 className="card-title">Health Workforce by Country — {yLabel}</h2>
+                        <span className="card-subtitle">Epidemiologists · lab technicians · highest to lowest</span>
+                      </div>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, color: '#D97706',
+                        background: '#FFF8ED', border: '1px solid #FDE68A',
+                        borderRadius: 6, padding: '3px 10px',
+                      }}>
+                        ↓ Low count = understaffed
+                      </span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={Math.max(260, cmpWorkforce.length * 42) + 48}>
+                      <BarChart
+                        data={cmpWorkforce}
+                        layout="vertical"
+                        margin={{ top: 48, right: 40, left: 4, bottom: 4 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
+                        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7C93' }} />
+                        <YAxis type="category" dataKey="country" width={175} tick={{ fontSize: 11, fill: '#1A2B4A' }} />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null
+                            const d = payload[0]?.payload
+                            return (
+                              <div className="chart-tooltip">
+                                <p className="tooltip-label">{d?.country}</p>
+                                <p>Epidemiologists: <strong>{d?.epidemiologists?.toLocaleString()}</strong></p>
+                                <p>Lab Technicians: <strong>{d?.lab_technicians?.toLocaleString()}</strong></p>
+                                <p style={{ color: '#6B7C93', fontSize: 11 }}>{d?.subregion} Africa</p>
+                              </div>
+                            )
+                          }}
+                        />
+                        <Legend verticalAlign="top" height={40} wrapperStyle={{ fontSize: 11, top: 0 }} />
+                        <Bar dataKey="epidemiologists" name="Epidemiologists" maxBarSize={14} radius={[0, 4, 4, 0]}>
+                          {cmpWorkforce.map(c => (
+                            <Cell key={c.iso3} fill={REGION_COLORS[c.subregion] || '#888'} />
+                          ))}
+                        </Bar>
+                        <Bar dataKey="lab_technicians" name="Lab Technicians" maxBarSize={14} radius={[0, 4, 4, 0]} fill="#94a3b8" opacity={0.65} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+              )}
+
+              {/* Population by Country */}
+              {cmpPopulation.length > 0 && (
+                <section className="section">
+                  <div className="card">
+                    <div className="card-header">
+                      <div>
+                        <h2 className="card-title">Population by Country — {yLabel}</h2>
+                        <span className="card-subtitle">Total population · highest to lowest</span>
+                      </div>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, color: '#0071BC',
+                        background: '#EBF5FF', border: '1px solid #93C5FD',
+                        borderRadius: 6, padding: '3px 10px',
+                      }}>
+                        Context for per-capita comparisons
+                      </span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={Math.max(260, cmpPopulation.length * 34) + 16}>
+                      <BarChart
+                        data={cmpPopulation}
+                        layout="vertical"
+                        margin={{ top: 8, right: 56, left: 4, bottom: 4 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
+                        <XAxis
+                          type="number"
+                          tickFormatter={v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(0)}M` : `${(v / 1_000).toFixed(0)}k`}
+                          tick={{ fontSize: 11, fill: '#6B7C93' }}
+                        />
+                        <YAxis type="category" dataKey="country" width={175} tick={{ fontSize: 11, fill: '#1A2B4A' }} />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null
+                            const d = payload[0]?.payload
+                            return (
+                              <div className="chart-tooltip">
+                                <p className="tooltip-label">{d?.country}</p>
+                                <p>Population: <strong>{d?.population?.toLocaleString()}</strong></p>
+                                <p style={{ color: '#6B7C93', fontSize: 11 }}>{d?.subregion} Africa</p>
+                              </div>
+                            )
+                          }}
+                        />
+                        <Bar dataKey="population" name="Population" maxBarSize={18} radius={[0, 4, 4, 0]}
+                          label={{
+                            position: 'right', fontSize: 10, fill: '#6B7C93',
+                            formatter: v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v ? `${(v / 1_000).toFixed(0)}k` : '',
+                          }}
+                        >
+                          {cmpPopulation.map(c => (
+                            <Cell key={c.iso3} fill={REGION_COLORS[c.subregion] || '#888'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+              )}
+
+              {/* Funding by Country */}
+              {cmpFunding.length > 0 && (
+                <section className="section">
+                  <div className="card">
+                    <div className="card-header">
+                      <div>
+                        <h2 className="card-title">Health Funding by Country — {yLabel}</h2>
+                        <span className="card-subtitle">Total funding (USD) · highest to lowest</span>
+                      </div>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, color: '#D97706',
+                        background: '#FFF8ED', border: '1px solid #FDE68A',
+                        borderRadius: 6, padding: '3px 10px',
+                      }}>
+                        ↓ Low funding = potential gap
+                      </span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={Math.max(260, cmpFunding.length * 34) + 16}>
+                      <BarChart
+                        data={cmpFunding}
+                        layout="vertical"
+                        margin={{ top: 8, right: 70, left: 4, bottom: 4 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
+                        <XAxis
+                          type="number"
+                          tickFormatter={v => `$${(v / 1_000_000).toFixed(0)}M`}
+                          tick={{ fontSize: 11, fill: '#6B7C93' }}
+                        />
+                        <YAxis type="category" dataKey="country" width={175} tick={{ fontSize: 11, fill: '#1A2B4A' }} />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null
+                            const d = payload[0]?.payload
+                            return (
+                              <div className="chart-tooltip">
+                                <p className="tooltip-label">{d?.country}</p>
+                                <p>Total Funding: <strong>${d?.funding?.toLocaleString()}</strong></p>
+                                <p>≈ <strong>${(d?.funding / 1_000_000).toFixed(1)}M</strong></p>
+                                <p style={{ color: '#6B7C93', fontSize: 11 }}>{d?.subregion} Africa</p>
+                              </div>
+                            )
+                          }}
+                        />
+                        <Bar dataKey="funding" name="Total Funding (USD)" maxBarSize={18} radius={[0, 4, 4, 0]}
+                          label={{
+                            position: 'right', fontSize: 10, fill: '#6B7C93',
+                            formatter: v => v ? `$${(v / 1_000_000).toFixed(1)}M` : '',
+                          }}
+                        >
+                          {cmpFunding.map(c => (
+                            <Cell key={c.iso3} fill={REGION_COLORS[c.subregion] || '#888'} />
+                          ))}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
