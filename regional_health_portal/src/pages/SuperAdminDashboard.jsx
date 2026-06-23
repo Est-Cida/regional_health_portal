@@ -551,33 +551,6 @@ export default function SuperAdminDashboard() {
           {tab === 'overview' && (
             <>
               <section className="section">
-                <div className="kpi-grid">
-                  <div className="kpi-card" style={{ borderTop: '4px solid #0071BC', background: '#EBF5FF' }}>
-                    <div className="kpi-card-header"><span className="kpi-title">Total Cases (AFRO)</span></div>
-                    <div className="kpi-value" style={{ color: '#0071BC' }}>{afroTotals.totalCases.toLocaleString()}</div>
-                    <div className="kpi-subtitle">{filterDesc} · {yLabel}</div>
-                  </div>
-                  <div className="kpi-card" style={{ borderTop: '4px solid #C00000', background: '#FFF0F0' }}>
-                    <div className="kpi-card-header"><span className="kpi-title">Total Deaths (AFRO)</span></div>
-                    <div className="kpi-value" style={{ color: '#C00000' }}>{afroTotals.totalDeaths.toLocaleString()}</div>
-                    <div className="kpi-subtitle">{filterDesc} · {yLabel}</div>
-                  </div>
-                  <div className="kpi-card" style={{ borderTop: '4px solid #D97706', background: '#FFF8ED' }}>
-                    <div className="kpi-card-header"><span className="kpi-title">Total Outbreaks</span></div>
-                    <div className="kpi-value" style={{ color: '#D97706' }}>{afroTotals.totalObs}</div>
-                    <div className="kpi-subtitle">{yLabel}</div>
-                  </div>
-                  <div className="kpi-card" style={{ borderTop: '4px solid #7B2D8B', background: '#F5F0FF' }}>
-                    <div className="kpi-card-header"><span className="kpi-title">Overall CFR</span></div>
-                    <div className="kpi-value" style={{ color: '#7B2D8B' }}>
-                      {afroTotals.cfr !== '—' ? `${afroTotals.cfr}%` : '—'}
-                    </div>
-                    <div className="kpi-subtitle">Deaths / Cases · {yLabel}</div>
-                  </div>
-                </div>
-              </section>
-
-              <section className="section">
                 <h2 className="section-heading">Region Summary</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
                   {bySubregion.map(sub => (
