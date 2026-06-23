@@ -386,9 +386,8 @@ export default function SuperAdminDashboard() {
           {/* Tabs */}
           <div className="page-tab-bar">
             {[
-              { key: 'overview',   label: 'Overview'          },
-              { key: 'analytics', label: 'Country Analytics'  },
-              { key: 'table',      label: 'Country Summary'   },
+              { key: 'overview', label: 'Overview'        },
+              { key: 'table',    label: 'Country Summary' },
             ].map(t => (
               <button
                 key={t.key}
@@ -560,12 +559,8 @@ export default function SuperAdminDashboard() {
                   </div>
                 </section>
               )}
-            </>
-          )}
 
-          {/* ── COUNTRY ANALYTICS TAB ── */}
-          {tab === 'analytics' && (
-            <>
+              {/* ── Country Rankings ── */}
               <section className="section">
                 <div style={{
                   background: '#F0F7FF', border: '1px solid #C7DCF5',
