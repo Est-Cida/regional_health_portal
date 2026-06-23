@@ -36,12 +36,41 @@ const SITUATION_COLORS = {
   Critical: '#7B1D1D',
 }
 
-function getSituation(outbreaks) {
-  if (!outbreaks || outbreaks <= 2)  return 'Minimal'
-  if (outbreaks <= 6)                return 'Low'
-  if (outbreaks <= 12)               return 'Moderate'
-  if (outbreaks <= 20)               return 'Severe'
-  return 'Critical'
+function computeSituation(metric, value) {
+  if (value == null) return 'Critical'
+  switch (metric) {
+    case 'outbreaks':   // more = worse
+      if (value <= 2)  return 'Minimal'
+      if (value <= 6)  return 'Low'
+      if (value <= 12) return 'Moderate'
+      if (value <= 20) return 'Severe'
+      return 'Critical'
+    case 'labs':        // fewer = worse
+      if (value >= 26) return 'Minimal'
+      if (value >= 17) return 'Low'
+      if (value >= 10) return 'Moderate'
+      if (value >= 5)  return 'Severe'
+      return 'Critical'
+    case 'workforce':   // fewer epidemiologists = worse
+      if (value >= 301) return 'Minimal'
+      if (value >= 151) return 'Low'
+      if (value >= 76)  return 'Moderate'
+      if (value >= 26)  return 'Severe'
+      return 'Critical'
+    case 'population':  // larger population = more service burden
+      if (value < 3_000_000)  return 'Minimal'
+      if (value < 10_000_000) return 'Low'
+      if (value < 30_000_000) return 'Moderate'
+      if (value < 80_000_000) return 'Severe'
+      return 'Critical'
+    case 'funding':     // lower funding = worse
+      if (value >= 500_000_000) return 'Minimal'
+      if (value >= 300_000_000) return 'Low'
+      if (value >= 150_000_000) return 'Moderate'
+      if (value >= 50_000_000)  return 'Severe'
+      return 'Critical'
+    default: return 'Moderate'
+  }
 }
 
 const PRIORITY_LABEL = { 1: 'High', 2: 'Medium', 3: 'Standard' }
@@ -100,7 +129,8 @@ function MetricCell({ icon, label, value, accent, highlighted, last }) {
 
 function CountryRankRow({ rank, country, iso3, subregion, data, sortBy }) {
   const regionCol = REGION_COLORS[subregion] || '#888'
-  const { outbreaks, total_public_labs, accreditation_pct, epidemiologists, population, funding } = data
+  const { outbreaks, total_public_labs, accreditation_pct, epidemiologists, population, funding, situations } = data
+  const currentSituation = situations?.[sortBy]
   const fmtP = v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v ? `${(v / 1_000).toFixed(0)}k` : null
   const fmtF = v => v ? `$${(v / 1_000_000).toFixed(1)}M` : null
   return (
@@ -120,13 +150,13 @@ function CountryRankRow({ rank, country, iso3, subregion, data, sortBy }) {
         }}>#{rank}</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: '#1A2B4A' }}>{country}</span>
         <span style={{ fontSize: 11, color: '#94a3b8' }}>{iso3}</span>
-        {data.situation && (
+        {currentSituation && (
           <span style={{
             fontSize: 10, fontWeight: 700,
-            color: SITUATION_COLORS[data.situation],
-            background: SITUATION_COLORS[data.situation] + '18',
+            color: SITUATION_COLORS[currentSituation],
+            background: SITUATION_COLORS[currentSituation] + '18',
             padding: '2px 8px', borderRadius: 99, flexShrink: 0,
-          }}>{data.situation}</span>
+          }}>{currentSituation}</span>
         )}
         <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: regionCol, flexShrink: 0 }}>
           {subregion} Africa
@@ -343,24 +373,35 @@ export default function SuperAdminDashboard() {
     })
   }, [activeCountries, selectedYears, allYearsSelected])
 
-  // Merged per-country dataset: all 5 indicators + derived situation level
+  // Merged per-country dataset: all 5 indicators + per-metric situation levels
   const countryRankings = useMemo(() => {
     const labMap = Object.fromEntries(labsByCountry.map(l => [l.iso3, l]))
-    return countryComparison.map(c => ({
-      ...c,
-      total_public_labs:        labMap[c.iso3]?.total_public_labs        ?? null,
-      labs_iso15189_accredited: labMap[c.iso3]?.labs_iso15189_accredited ?? null,
-      accreditation_pct:        labMap[c.iso3]?.accreditation_pct        ?? null,
-      situation: getSituation(c.outbreaks),
-    }))
+    return countryComparison.map(c => {
+      const total_public_labs        = labMap[c.iso3]?.total_public_labs        ?? null
+      const labs_iso15189_accredited = labMap[c.iso3]?.labs_iso15189_accredited ?? null
+      const accreditation_pct        = labMap[c.iso3]?.accreditation_pct        ?? null
+      return {
+        ...c,
+        total_public_labs,
+        labs_iso15189_accredited,
+        accreditation_pct,
+        situations: {
+          outbreaks:  computeSituation('outbreaks',  c.outbreaks),
+          labs:       computeSituation('labs',       total_public_labs),
+          workforce:  computeSituation('workforce',  c.epidemiologists),
+          population: computeSituation('population', c.population),
+          funding:    computeSituation('funding',    c.funding),
+        },
+      }
+    })
   }, [countryComparison, labsByCountry])
 
   const allSituationsSelected = selectedSituations.length === SITUATION_LEVELS.length
 
   const filteredRankings = useMemo(() => {
     if (allSituationsSelected) return countryRankings
-    return countryRankings.filter(c => selectedSituations.includes(c.situation))
-  }, [countryRankings, selectedSituations, allSituationsSelected])
+    return countryRankings.filter(c => selectedSituations.includes(c.situations[sortBy]))
+  }, [countryRankings, selectedSituations, allSituationsSelected, sortBy])
 
   const SORT_KEYS = {
     outbreaks: 'outbreaks', labs: 'total_public_labs',
