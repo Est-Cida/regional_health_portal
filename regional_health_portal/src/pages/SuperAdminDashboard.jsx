@@ -58,6 +58,82 @@ function fmtYearLabel(years) {
   return `${years.length} Years`
 }
 
+function TopCard({ rank, name, iso3, subregion, value, accent }) {
+  const regionCol = REGION_COLORS[subregion] || '#888'
+  return (
+    <div style={{
+      minWidth: 158, maxWidth: 158, flexShrink: 0,
+      border: '1.5px solid #E5EAF0', borderRadius: 10,
+      overflow: 'hidden', background: '#fff',
+      boxShadow: '0 1px 4px rgba(26,43,74,0.07)',
+    }}>
+      <div style={{ height: 4, background: regionCol }} />
+      <div style={{ padding: '10px 13px 13px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
+          <span style={{
+            fontSize: 10, fontWeight: 800, color: regionCol,
+            background: regionCol + '18', padding: '2px 8px', borderRadius: 99,
+          }}>
+            #{rank}
+          </span>
+          <span style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            {subregion}
+          </span>
+        </div>
+        <div style={{
+          fontSize: 12, fontWeight: 700, color: '#1A2B4A', marginBottom: 2,
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          {name}
+        </div>
+        <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 10 }}>{iso3}</div>
+        <div style={{ fontSize: 22, fontWeight: 800, color: accent, lineHeight: 1.1 }}>{value}</div>
+      </div>
+    </div>
+  )
+}
+
+function TopRow({ label, icon, accent, subtitle, data, sliceN, valueKey, formatValue }) {
+  const rows = data.slice(0, sliceN)
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{
+          width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+          background: accent + '18', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', fontSize: 15,
+        }}>
+          {icon}
+        </span>
+        <div>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#1A2B4A' }}>{label}</span>
+          {subtitle && (
+            <span style={{ fontSize: 11, color: '#6B7C93', marginLeft: 8 }}>{subtitle}</span>
+          )}
+        </div>
+      </div>
+      {rows.length === 0 ? (
+        <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 4px' }}>No data for selected filters.</p>
+      ) : (
+        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+          {rows.map((c, i) => (
+            <TopCard
+              key={c.iso3}
+              rank={i + 1}
+              name={c.country ?? c.country_name}
+              iso3={c.iso3}
+              subregion={c.subregion}
+              value={formatValue(c[valueKey])}
+              accent={accent}
+            />
+          ))}
+        </div>
+      )}
+      <div style={{ borderBottom: '1.5px solid #F0F4FA', margin: '16px 0' }} />
+    </div>
+  )
+}
+
 export default function SuperAdminDashboard() {
   const navigate = useNavigate()
 
@@ -66,6 +142,7 @@ export default function SuperAdminDashboard() {
   const [selectedDiseases, setSelectedDiseases] = useState([...ALL_DISEASES])
   const [tab,              setTab]              = useState('overview')
   const [tableMode,        setTableMode]        = useState('country')
+  const [topN,             setTopN]             = useState(5)
 
   const allYearsSelected    = selectedYears.length    === YEARS.length
   const allRegionsSelected  = selectedRegions.length  === SUBREGIONS.length
@@ -579,251 +656,82 @@ export default function SuperAdminDashboard() {
                 </section>
               )}
 
-              {/* ── Country Rankings ── */}
+              {/* ── Top Countries by Indicator ── */}
               <section className="section">
-                <div style={{
-                  background: '#F0F7FF', border: '1px solid #C7DCF5',
-                  borderRadius: 10, padding: '14px 20px',
-                  fontSize: 13, color: '#1A2B4A', lineHeight: 1.6,
-                }}>
-                  <strong>Country Rankings — {yLabel}</strong>
-                  &nbsp;·&nbsp; Each bar is coloured by region.
-                  Bars at the <strong>bottom</strong> of Workforce and Funding charts indicate countries that may need additional support.
-                  &nbsp;{filterDesc}.
-                </div>
-              </section>
+                <div className="card" style={{ padding: '20px 24px' }}>
 
-              {/* Outbreaks by Country */}
-              {cmpOutbreaks.length > 0 && (
-                <section className="section">
-                  <div className="card">
-                    <div className="card-header">
-                      <div>
-                        <h2 className="card-title">Outbreaks by Country — {yLabel}</h2>
-                        <span className="card-subtitle">Total outbreak events · highest to lowest</span>
-                      </div>
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, color: '#C00000',
-                        background: '#FFF0F0', border: '1px solid #FCA5A5',
-                        borderRadius: 6, padding: '3px 10px',
-                      }}>
-                        ↑ High count = higher disease burden
-                      </span>
+                  {/* Header + Top-N filter */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+                    <div>
+                      <h2 className="card-title" style={{ marginBottom: 2 }}>Top Countries by Indicator — {yLabel}</h2>
+                      <p style={{ fontSize: 12, color: '#6B7C93', margin: 0 }}>
+                        Each card is coloured by region · {filterDesc}
+                      </p>
                     </div>
-                    <ResponsiveContainer width="100%" height={Math.max(260, cmpOutbreaks.length * 34) + 16}>
-                      <BarChart
-                        data={cmpOutbreaks}
-                        layout="vertical"
-                        margin={{ top: 8, right: 56, left: 4, bottom: 4 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
-                        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7C93' }} />
-                        <YAxis type="category" dataKey="country" width={175} tick={{ fontSize: 11, fill: '#1A2B4A' }} />
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (!active || !payload?.length) return null
-                            const d = payload[0]?.payload
-                            return (
-                              <div className="chart-tooltip">
-                                <p className="tooltip-label">{d?.country} <span style={{ color: '#6B7C93' }}>({d?.iso3})</span></p>
-                                <p>Outbreaks: <strong>{d?.outbreaks}</strong></p>
-                                <p style={{ color: '#6B7C93', fontSize: 11 }}>{d?.subregion} Africa</p>
-                              </div>
-                            )
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 16 }}>
+                      <span style={{ fontSize: 12, color: '#6B7C93' }}>Show top:</span>
+                      {[5, 10, 15, 20].map(n => (
+                        <button
+                          key={n}
+                          onClick={() => setTopN(n)}
+                          style={{
+                            padding: '5px 14px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+                            border: '1.5px solid', cursor: 'pointer',
+                            borderColor: topN === n ? '#0071BC' : '#D1DBE8',
+                            background:  topN === n ? '#0071BC' : '#fff',
+                            color:       topN === n ? '#fff'    : '#6B7C93',
                           }}
-                        />
-                        <Bar dataKey="outbreaks" name="Outbreaks" maxBarSize={18} radius={[0, 4, 4, 0]}
-                          label={{ position: 'right', fontSize: 11, fill: '#1A2B4A', formatter: v => v || '' }}
                         >
-                          {cmpOutbreaks.map(c => (
-                            <Cell key={c.iso3} fill={REGION_COLORS[c.subregion] || '#888'} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', padding: '8px 16px 16px', borderTop: '1px solid #E5EAF0' }}>
-                      {Object.entries(REGION_COLORS).map(([r, col]) => (
-                        <span key={r} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#1A2B4A' }}>
-                          <span style={{ width: 12, height: 12, borderRadius: 3, background: col, display: 'inline-block' }} />
-                          {r} Africa
-                        </span>
+                          {n}
+                        </button>
                       ))}
                     </div>
                   </div>
-                </section>
-              )}
 
-              {/* Health Workforce by Country */}
-              {cmpWorkforce.length > 0 && (
-                <section className="section">
-                  <div className="card">
-                    <div className="card-header">
-                      <div>
-                        <h2 className="card-title">Health Workforce by Country — {yLabel}</h2>
-                        <span className="card-subtitle">Epidemiologists · lab technicians · highest to lowest</span>
-                      </div>
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, color: '#D97706',
-                        background: '#FFF8ED', border: '1px solid #FDE68A',
-                        borderRadius: 6, padding: '3px 10px',
-                      }}>
-                        ↓ Low count = understaffed
-                      </span>
-                    </div>
-                    <ResponsiveContainer width="100%" height={Math.max(260, cmpWorkforce.length * 42) + 48}>
-                      <BarChart
-                        data={cmpWorkforce}
-                        layout="vertical"
-                        margin={{ top: 48, right: 40, left: 4, bottom: 4 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
-                        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7C93' }} />
-                        <YAxis type="category" dataKey="country" width={175} tick={{ fontSize: 11, fill: '#1A2B4A' }} />
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (!active || !payload?.length) return null
-                            const d = payload[0]?.payload
-                            return (
-                              <div className="chart-tooltip">
-                                <p className="tooltip-label">{d?.country}</p>
-                                <p>Epidemiologists: <strong>{d?.epidemiologists?.toLocaleString()}</strong></p>
-                                <p>Lab Technicians: <strong>{d?.lab_technicians?.toLocaleString()}</strong></p>
-                                <p style={{ color: '#6B7C93', fontSize: 11 }}>{d?.subregion} Africa</p>
-                              </div>
-                            )
-                          }}
-                        />
-                        <Legend verticalAlign="top" height={40} wrapperStyle={{ fontSize: 11, top: 0 }} />
-                        <Bar dataKey="epidemiologists" name="Epidemiologists" maxBarSize={14} radius={[0, 4, 4, 0]}>
-                          {cmpWorkforce.map(c => (
-                            <Cell key={c.iso3} fill={REGION_COLORS[c.subregion] || '#888'} />
-                          ))}
-                        </Bar>
-                        <Bar dataKey="lab_technicians" name="Lab Technicians" maxBarSize={14} radius={[0, 4, 4, 0]} fill="#94a3b8" opacity={0.65} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </section>
-              )}
+                  <TopRow
+                    label="Outbreaks" icon="⚠️" accent="#C00000"
+                    subtitle="total outbreak events — highest to lowest"
+                    data={cmpOutbreaks} sliceN={topN}
+                    valueKey="outbreaks" formatValue={v => String(v ?? 0)}
+                  />
+                  <TopRow
+                    label="Public Labs" icon="🔬" accent="#0071BC"
+                    subtitle="total public labs — highest to lowest"
+                    data={labsByCountry} sliceN={topN}
+                    valueKey="total_public_labs" formatValue={v => String(v ?? 0)}
+                  />
+                  <TopRow
+                    label="Health Workforce" icon="🩺" accent="#059669"
+                    subtitle="epidemiologists — highest to lowest"
+                    data={cmpWorkforce} sliceN={topN}
+                    valueKey="epidemiologists" formatValue={v => v?.toLocaleString() ?? '—'}
+                  />
+                  <TopRow
+                    label="Population" icon="👥" accent="#7B2D8B"
+                    subtitle="total population — highest to lowest"
+                    data={cmpPopulation} sliceN={topN}
+                    valueKey="population"
+                    formatValue={v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v ? `${(v / 1_000).toFixed(0)}k` : '—'}
+                  />
+                  <TopRow
+                    label="Funding" icon="💰" accent="#D97706"
+                    subtitle="total health funding — highest to lowest"
+                    data={cmpFunding} sliceN={topN}
+                    valueKey="funding" formatValue={v => v ? `$${(v / 1_000_000).toFixed(1)}M` : '—'}
+                  />
 
-              {/* Population by Country */}
-              {cmpPopulation.length > 0 && (
-                <section className="section">
-                  <div className="card">
-                    <div className="card-header">
-                      <div>
-                        <h2 className="card-title">Population by Country — {yLabel}</h2>
-                        <span className="card-subtitle">Total population · highest to lowest</span>
-                      </div>
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, color: '#0071BC',
-                        background: '#EBF5FF', border: '1px solid #93C5FD',
-                        borderRadius: 6, padding: '3px 10px',
-                      }}>
-                        Context for per-capita comparisons
+                  {/* Region legend */}
+                  <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', paddingTop: 4 }}>
+                    {Object.entries(REGION_COLORS).map(([r, col]) => (
+                      <span key={r} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#1A2B4A' }}>
+                        <span style={{ width: 12, height: 12, borderRadius: 3, background: col, display: 'inline-block' }} />
+                        {r} Africa
                       </span>
-                    </div>
-                    <ResponsiveContainer width="100%" height={Math.max(260, cmpPopulation.length * 34) + 16}>
-                      <BarChart
-                        data={cmpPopulation}
-                        layout="vertical"
-                        margin={{ top: 8, right: 56, left: 4, bottom: 4 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
-                        <XAxis
-                          type="number"
-                          tickFormatter={v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(0)}M` : `${(v / 1_000).toFixed(0)}k`}
-                          tick={{ fontSize: 11, fill: '#6B7C93' }}
-                        />
-                        <YAxis type="category" dataKey="country" width={175} tick={{ fontSize: 11, fill: '#1A2B4A' }} />
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (!active || !payload?.length) return null
-                            const d = payload[0]?.payload
-                            return (
-                              <div className="chart-tooltip">
-                                <p className="tooltip-label">{d?.country}</p>
-                                <p>Population: <strong>{d?.population?.toLocaleString()}</strong></p>
-                                <p style={{ color: '#6B7C93', fontSize: 11 }}>{d?.subregion} Africa</p>
-                              </div>
-                            )
-                          }}
-                        />
-                        <Bar dataKey="population" name="Population" maxBarSize={18} radius={[0, 4, 4, 0]}
-                          label={{
-                            position: 'right', fontSize: 10, fill: '#6B7C93',
-                            formatter: v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v ? `${(v / 1_000).toFixed(0)}k` : '',
-                          }}
-                        >
-                          {cmpPopulation.map(c => (
-                            <Cell key={c.iso3} fill={REGION_COLORS[c.subregion] || '#888'} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+                    ))}
                   </div>
-                </section>
-              )}
+                </div>
+              </section>
 
-              {/* Funding by Country */}
-              {cmpFunding.length > 0 && (
-                <section className="section">
-                  <div className="card">
-                    <div className="card-header">
-                      <div>
-                        <h2 className="card-title">Health Funding by Country — {yLabel}</h2>
-                        <span className="card-subtitle">Total funding (USD) · highest to lowest</span>
-                      </div>
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, color: '#D97706',
-                        background: '#FFF8ED', border: '1px solid #FDE68A',
-                        borderRadius: 6, padding: '3px 10px',
-                      }}>
-                        ↓ Low funding = potential gap
-                      </span>
-                    </div>
-                    <ResponsiveContainer width="100%" height={Math.max(260, cmpFunding.length * 34) + 16}>
-                      <BarChart
-                        data={cmpFunding}
-                        layout="vertical"
-                        margin={{ top: 8, right: 70, left: 4, bottom: 4 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
-                        <XAxis
-                          type="number"
-                          tickFormatter={v => `$${(v / 1_000_000).toFixed(0)}M`}
-                          tick={{ fontSize: 11, fill: '#6B7C93' }}
-                        />
-                        <YAxis type="category" dataKey="country" width={175} tick={{ fontSize: 11, fill: '#1A2B4A' }} />
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (!active || !payload?.length) return null
-                            const d = payload[0]?.payload
-                            return (
-                              <div className="chart-tooltip">
-                                <p className="tooltip-label">{d?.country}</p>
-                                <p>Total Funding: <strong>${d?.funding?.toLocaleString()}</strong></p>
-                                <p>≈ <strong>${(d?.funding / 1_000_000).toFixed(1)}M</strong></p>
-                                <p style={{ color: '#6B7C93', fontSize: 11 }}>{d?.subregion} Africa</p>
-                              </div>
-                            )
-                          }}
-                        />
-                        <Bar dataKey="funding" name="Total Funding (USD)" maxBarSize={18} radius={[0, 4, 4, 0]}
-                          label={{
-                            position: 'right', fontSize: 10, fill: '#6B7C93',
-                            formatter: v => v ? `$${(v / 1_000_000).toFixed(1)}M` : '',
-                          }}
-                        >
-                          {cmpFunding.map(c => (
-                            <Cell key={c.iso3} fill={REGION_COLORS[c.subregion] || '#888'} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </section>
-              )}
             </>
           )}
 
