@@ -13,7 +13,6 @@ import {
   getRawLabCapacity,
   getRawWorkforce,
   getRawFunding,
-  getRawPopulation,
 } from '../data/dataService'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -50,7 +49,6 @@ const RAW_OUTBREAKS    = getRawOutbreaks()
 const RAW_LAB          = getRawLabCapacity()
 const RAW_WORKFORCE    = getRawWorkforce()
 const RAW_FUNDING      = getRawFunding()
-const RAW_POPULATION   = getRawPopulation()
 
 function fmtYearLabel(years) {
   if (!years.length || years.length === YEARS.length) return 'All Years'
@@ -211,49 +209,6 @@ export default function SuperAdminDashboard() {
     }).filter(Boolean).sort((a, b) => b.total_public_labs - a.total_public_labs)
   }, [activeCountries, selectedYears, allYearsSelected])
 
-  // Per-country population (averaged across selected years)
-  const populationByCountry = useMemo(() => {
-    return activeCountries.map(c => {
-      const iso3 = c.iso_3_code
-      const rows = RAW_POPULATION.filter(p =>
-        p.iso_3_code === iso3 &&
-        (allYearsSelected || selectedYears.includes(p.year))
-      )
-      if (!rows.length) return null
-      const n = rows.length
-      return {
-        country:          c.country_name,
-        subregion:        c.afro_subregion,
-        iso3,
-        total_population:   Math.round(rows.reduce((s, r) => s + (Number(r.total_population)   || 0), 0) / n),
-        under5_population:  Math.round(rows.reduce((s, r) => s + (Number(r.under5_population)  || 0), 0) / n),
-        urban_pct:                      rows.reduce((s, r) => s + (Number(r.urban_population_pct) || 0), 0) / n,
-      }
-    }).filter(Boolean).sort((a, b) => b.total_population - a.total_population)
-  }, [activeCountries, selectedYears, allYearsSelected])
-
-  const populationTotals = useMemo(() => {
-    const total   = populationByCountry.reduce((s, c) => s + c.total_population,  0)
-    const under5  = populationByCountry.reduce((s, c) => s + c.under5_population, 0)
-    const avgUrban = populationByCountry.length
-      ? populationByCountry.reduce((s, c) => s + c.urban_pct, 0) / populationByCountry.length
-      : 0
-    return { total, under5, avgUrban, countries: populationByCountry.length }
-  }, [populationByCountry])
-
-  const populationByRegion = useMemo(() => {
-    const activeRegions = allRegionsSelected ? SUBREGIONS : selectedRegions
-    return activeRegions.map(sub => {
-      const rows = populationByCountry.filter(c => c.subregion === sub)
-      return {
-        name:            sub,
-        total_population: rows.reduce((s, c) => s + c.total_population,  0),
-        under5_population: rows.reduce((s, c) => s + c.under5_population, 0),
-        countries:       rows.length,
-      }
-    }).filter(r => r.countries > 0)
-  }, [populationByCountry, selectedRegions, allRegionsSelected])
-
   // Region-level aggregates (only selected regions)
   const bySubregion = useMemo(() => {
     const activeRegions = allRegionsSelected ? SUBREGIONS : selectedRegions
@@ -375,9 +330,8 @@ export default function SuperAdminDashboard() {
           {/* Tabs */}
           <div className="page-tab-bar">
             {[
-              { key: 'overview',   label: 'Overview'        },
-              { key: 'population', label: 'Population'      },
-              { key: 'table',      label: 'Country Summary' },
+              { key: 'overview', label: 'Overview'        },
+              { key: 'table',    label: 'Country Summary' },
             ].map(t => (
               <button
                 key={t.key}
@@ -546,205 +500,6 @@ export default function SuperAdminDashboard() {
                         <Bar dataKey="labs_iso15189_accredited" name="ISO 15189 Accredited" fill="#059669" radius={[0, 4, 4, 0]} maxBarSize={14} />
                       </BarChart>
                     </ResponsiveContainer>
-                  </div>
-                </section>
-              )}
-            </>
-          )}
-
-          {/* ── POPULATION TAB ── */}
-          {tab === 'population' && (
-            <>
-              {/* KPI row */}
-              <section className="section">
-                <div className="kpi-grid">
-                  <div className="kpi-card" style={{ borderTop: '4px solid #0071BC', background: '#EBF5FF' }}>
-                    <div className="kpi-card-header"><span className="kpi-title">Total Population</span></div>
-                    <div className="kpi-value" style={{ color: '#0071BC', fontSize: 26 }}>
-                      {(populationTotals.total / 1_000_000).toFixed(1)}M
-                    </div>
-                    <div className="kpi-subtitle">{filterDesc} · {yLabel}</div>
-                  </div>
-                  <div className="kpi-card" style={{ borderTop: '4px solid #7B2D8B', background: '#F5F0FF' }}>
-                    <div className="kpi-card-header"><span className="kpi-title">Under-5 Population</span></div>
-                    <div className="kpi-value" style={{ color: '#7B2D8B', fontSize: 26 }}>
-                      {(populationTotals.under5 / 1_000_000).toFixed(1)}M
-                    </div>
-                    <div className="kpi-subtitle">{yLabel}</div>
-                  </div>
-                  <div className="kpi-card" style={{ borderTop: '4px solid #059669', background: '#F0FFF4' }}>
-                    <div className="kpi-card-header"><span className="kpi-title">Avg Urban Population</span></div>
-                    <div className="kpi-value" style={{ color: '#059669', fontSize: 26 }}>
-                      {populationTotals.avgUrban.toFixed(1)}%
-                    </div>
-                    <div className="kpi-subtitle">Average across {populationTotals.countries} countries</div>
-                  </div>
-                  <div className="kpi-card" style={{ borderTop: '4px solid #D97706', background: '#FFF8ED' }}>
-                    <div className="kpi-card-header"><span className="kpi-title">Countries Reporting</span></div>
-                    <div className="kpi-value" style={{ color: '#D97706', fontSize: 26 }}>
-                      {populationTotals.countries}
-                    </div>
-                    <div className="kpi-subtitle">of {activeCountries.length} active countries</div>
-                  </div>
-                </div>
-              </section>
-
-              {/* Region comparison */}
-              {populationByRegion.length > 0 && (
-                <section className="section">
-                  <div className="charts-grid">
-                    <div className="card">
-                      <div className="card-header">
-                        <h2 className="card-title">Population by Region — {yLabel}</h2>
-                      </div>
-                      <ResponsiveContainer width="100%" height={260}>
-                        <BarChart data={populationByRegion} margin={{ top: 4, right: 24, left: 8, bottom: 4 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5EAF0" />
-                          <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#1A2B4A' }} />
-                          <YAxis
-                            tickFormatter={v => `${(v / 1_000_000).toFixed(0)}M`}
-                            tick={{ fontSize: 11, fill: '#6B7C93' }}
-                            width={52}
-                          />
-                          <Tooltip
-                            formatter={v => [`${(v / 1_000_000).toFixed(2)}M`, undefined]}
-                            labelFormatter={l => `${l} Africa`}
-                          />
-                          <Legend wrapperStyle={{ fontSize: 12 }} />
-                          <Bar dataKey="total_population"  name="Total Population"  radius={[4, 4, 0, 0]}>
-                            {populationByRegion.map(s => (
-                              <Cell key={s.name} fill={REGION_COLORS[s.name] || '#888'} />
-                            ))}
-                          </Bar>
-                          <Bar dataKey="under5_population" name="Under-5 Population" radius={[4, 4, 0, 0]} fill="#7B2D8B" opacity={0.65} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-
-                    <div className="card">
-                      <div className="card-header">
-                        <h2 className="card-title">Population Share by Region — {yLabel}</h2>
-                      </div>
-                      <ResponsiveContainer width="100%" height={260}>
-                        <PieChart>
-                          <Pie
-                            data={populationByRegion}
-                            dataKey="total_population"
-                            nameKey="name"
-                            cx="50%" cy="50%"
-                            outerRadius={100}
-                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                            labelLine={false}
-                          >
-                            {populationByRegion.map(s => (
-                              <Cell key={s.name} fill={REGION_COLORS[s.name] || '#888'} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={v => `${(v / 1_000_000).toFixed(2)}M`} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </section>
-              )}
-
-              {/* Population by Country horizontal bar chart */}
-              {populationByCountry.length > 0 && (
-                <section className="section">
-                  <div className="card">
-                    <div className="card-header">
-                      <div>
-                        <h2 className="card-title">Population by Country — {yLabel}</h2>
-                      </div>
-                      <span className="card-subtitle">Total · under-5 · highest to lowest</span>
-                    </div>
-                    <ResponsiveContainer
-                      width="100%"
-                      height={Math.max(280, populationByCountry.length * 42) + 48}
-                    >
-                      <BarChart
-                        data={populationByCountry}
-                        layout="vertical"
-                        margin={{ top: 48, right: 40, left: 4, bottom: 4 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
-                        <XAxis
-                          type="number"
-                          tickFormatter={v => `${(v / 1_000_000).toFixed(0)}M`}
-                          tick={{ fontSize: 11, fill: '#6B7C93' }}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="country"
-                          width={175}
-                          tick={{ fontSize: 11, fill: '#1A2B4A' }}
-                        />
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (!active || !payload?.length) return null
-                            const d = payload[0]?.payload
-                            return (
-                              <div className="chart-tooltip">
-                                <p className="tooltip-label">{d?.country}</p>
-                                <p>Total Population: <strong>{d?.total_population?.toLocaleString()}</strong></p>
-                                <p>Under-5: <strong>{d?.under5_population?.toLocaleString()}</strong></p>
-                                <p>Urban: <strong>{d?.urban_pct?.toFixed(1)}%</strong></p>
-                              </div>
-                            )
-                          }}
-                        />
-                        <Legend verticalAlign="top" height={40} wrapperStyle={{ fontSize: 11, top: 0 }} />
-                        <Bar dataKey="total_population"  name="Total Population"  fill="#0071BC" radius={[0, 4, 4, 0]} maxBarSize={14} />
-                        <Bar dataKey="under5_population" name="Under-5 Population" fill="#7B2D8B" radius={[0, 4, 4, 0]} maxBarSize={14} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </section>
-              )}
-
-              {/* Population data table */}
-              {populationByCountry.length > 0 && (
-                <section className="section">
-                  <div className="card">
-                    <div className="card-header">
-                      <h2 className="card-title">Country Population Data — {yLabel}</h2>
-                    </div>
-                    <div className="table-wrapper">
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            <th>Country</th>
-                            <th>Region</th>
-                            <th>Total Population</th>
-                            <th>Under-5 Population</th>
-                            <th>Under-5 Share</th>
-                            <th>Urban Population %</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {populationByCountry.map(c => (
-                            <tr key={c.iso3}>
-                              <td><strong>{c.country}</strong> <span style={{ color: '#6B7C93', fontSize: 11 }}>{c.iso3}</span></td>
-                              <td>
-                                <span style={{ color: REGION_COLORS[c.subregion], fontWeight: 600, fontSize: 12 }}>
-                                  {c.subregion}
-                                </span>
-                              </td>
-                              <td className="num">{c.total_population.toLocaleString()}</td>
-                              <td className="num">{c.under5_population.toLocaleString()}</td>
-                              <td className="num">
-                                {c.total_population > 0
-                                  ? `${((c.under5_population / c.total_population) * 100).toFixed(1)}%`
-                                  : '—'}
-                              </td>
-                              <td className={`num ${c.urban_pct >= 60 ? 'text-success' : c.urban_pct < 35 ? 'text-warn' : ''}`}>
-                                {c.urban_pct.toFixed(1)}%
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
                   </div>
                 </section>
               )}

@@ -18,6 +18,15 @@ const UsersIcon = () => (
   </svg>
 )
 
+const PopulationIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="9" cy="7" r="3"/>
+    <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    <path d="M21 21v-2a4 4 0 0 0-3-3.87"/>
+  </svg>
+)
+
 const DiseaseIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round">
     {/* 6 main spokes */}
@@ -47,32 +56,35 @@ const DiseaseIcon = () => (
 
 const NAV_ITEMS = {
   country_admin: [
-    { to: '/country',            label: 'Country Overview',    icon: '🏛️',        end: true  },
-    { to: '/country/diseases',   label: 'Disease Surveillance',icon: <DiseaseIcon />, end: false },
-    { to: '/country/outbreaks',  label: 'Outbreaks',           icon: '⚠️',         end: false },
-    { to: '/country/laboratory', label: 'Laboratory',          icon: '🔬',         end: false },
-    { to: '/country/capacity',   label: 'Health Capacity',     icon: '👥',         end: false },
-    { to: '/country/funding',    label: 'Funding',             icon: '💰',         end: false },
+    { to: '/country',              label: 'Country Overview',    icon: '🏛️',             end: true  },
+    { to: '/country/diseases',     label: 'Disease Surveillance',icon: <DiseaseIcon />,    end: false },
+    { to: '/country/outbreaks',    label: 'Outbreaks',           icon: '⚠️',              end: false },
+    { to: '/country/laboratory',   label: 'Laboratory',          icon: '🔬',              end: false },
+    { to: '/country/population',   label: 'Population',          icon: <PopulationIcon />, end: false },
+    { to: '/country/capacity',     label: 'Health Capacity',     icon: '👥',              end: false },
+    { to: '/country/funding',      label: 'Funding',             icon: '💰',              end: false },
   ],
   regional_admin: [
-    { to: '/region',             label: 'Regional Overview',   icon: '🗺️',        end: true  },
-    { to: '/country',            label: 'Country View',        icon: '🏛️',        end: true  },
-    { to: '/country/diseases',   label: 'Disease Surveillance',icon: <DiseaseIcon />, end: false },
-    { to: '/country/outbreaks',  label: 'Outbreaks',           icon: '⚠️',         end: false },
-    { to: '/country/laboratory', label: 'Laboratory',          icon: '🔬',         end: false },
-    { to: '/country/capacity',   label: 'Health Capacity',     icon: '👥',         end: false },
-    { to: '/country/funding',    label: 'Funding',             icon: '💰',         end: false },
+    { to: '/region',               label: 'Regional Overview',   icon: '🗺️',             end: true  },
+    { to: '/country',              label: 'Country View',        icon: '🏛️',             end: true  },
+    { to: '/country/diseases',     label: 'Disease Surveillance',icon: <DiseaseIcon />,    end: false },
+    { to: '/country/outbreaks',    label: 'Outbreaks',           icon: '⚠️',              end: false },
+    { to: '/country/laboratory',   label: 'Laboratory',          icon: '🔬',              end: false },
+    { to: '/country/population',   label: 'Population',          icon: <PopulationIcon />, end: false },
+    { to: '/country/capacity',     label: 'Health Capacity',     icon: '👥',              end: false },
+    { to: '/country/funding',      label: 'Funding',             icon: '💰',              end: false },
   ],
   super_admin: [
-    { to: '/admin',              label: 'All Regions',         icon: '🌍',            end: true  },
-    { to: '/region',             label: 'Regional View',       icon: '🗺️',           end: true  },
-    { to: '/country',            label: 'Country Overview',    icon: '🏛️',           end: true  },
-    { to: '/country/diseases',   label: 'Disease Surveillance',icon: <DiseaseIcon />, end: false },
-    { to: '/country/outbreaks',  label: 'Outbreaks',           icon: '⚠️',            end: false },
-    { to: '/country/laboratory', label: 'Laboratory',          icon: '🔬',            end: false },
-    { to: '/country/capacity',   label: 'Health Capacity',     icon: '👥',            end: false },
-    { to: '/country/funding',    label: 'Funding',             icon: '💰',            end: false },
-    { to: '/admin/users',        label: 'User Management',     icon: <UsersIcon />,   end: false },
+    { to: '/admin',                label: 'All Regions',         icon: '🌍',              end: true  },
+    { to: '/region',               label: 'Regional View',       icon: '🗺️',             end: true  },
+    { to: '/country',              label: 'Country Overview',    icon: '🏛️',             end: true  },
+    { to: '/country/diseases',     label: 'Disease Surveillance',icon: <DiseaseIcon />,    end: false },
+    { to: '/country/outbreaks',    label: 'Outbreaks',           icon: '⚠️',              end: false },
+    { to: '/country/laboratory',   label: 'Laboratory',          icon: '🔬',              end: false },
+    { to: '/country/population',   label: 'Population',          icon: <PopulationIcon />, end: false },
+    { to: '/country/capacity',     label: 'Health Capacity',     icon: '👥',              end: false },
+    { to: '/country/funding',      label: 'Funding',             icon: '💰',              end: false },
+    { to: '/admin/users',          label: 'User Management',     icon: <UsersIcon />,      end: false },
   ],
 }
 
