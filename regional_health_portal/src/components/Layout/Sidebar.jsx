@@ -2,6 +2,15 @@ import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
+const UsersIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>
+)
+
 const DiseaseIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round">
     {/* 6 main spokes */}
@@ -48,14 +57,15 @@ const NAV_ITEMS = {
     { to: '/country/funding',    label: 'Funding',             icon: '💰',         end: false },
   ],
   super_admin: [
-    { to: '/admin',              label: 'All Regions',         icon: '🌍',         end: true  },
-    { to: '/region',             label: 'Regional View',       icon: '🗺️',        end: true  },
-    { to: '/country',            label: 'Country Overview',    icon: '🏛️',        end: true  },
+    { to: '/admin',              label: 'All Regions',         icon: '🌍',            end: true  },
+    { to: '/region',             label: 'Regional View',       icon: '🗺️',           end: true  },
+    { to: '/country',            label: 'Country Overview',    icon: '🏛️',           end: true  },
     { to: '/country/diseases',   label: 'Disease Surveillance',icon: <DiseaseIcon />, end: false },
-    { to: '/country/outbreaks',  label: 'Outbreaks',           icon: '⚠️',         end: false },
-    { to: '/country/laboratory', label: 'Laboratory',          icon: '🔬',         end: false },
-    { to: '/country/capacity',   label: 'Health Capacity',     icon: '👥',         end: false },
-    { to: '/country/funding',    label: 'Funding',             icon: '💰',         end: false },
+    { to: '/country/outbreaks',  label: 'Outbreaks',           icon: '⚠️',            end: false },
+    { to: '/country/laboratory', label: 'Laboratory',          icon: '🔬',            end: false },
+    { to: '/country/capacity',   label: 'Health Capacity',     icon: '👥',            end: false },
+    { to: '/country/funding',    label: 'Funding',             icon: '💰',            end: false },
+    { to: '/admin/users',        label: 'User Management',     icon: <UsersIcon />,   end: false },
   ],
 }
 

@@ -3,9 +3,10 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 
 // Top-level pages
-import LoginPage          from './pages/LoginPage'
-import RegionalDashboard  from './pages/RegionalDashboard'
-import SuperAdminDashboard from './pages/SuperAdminDashboard'
+import LoginPage            from './pages/LoginPage'
+import RegionalDashboard    from './pages/RegionalDashboard'
+import SuperAdminDashboard  from './pages/SuperAdminDashboard'
+import UserManagement       from './pages/UserManagement'
 
 // Country nested layout + sub-pages
 import CountryLayout       from './pages/country/CountryLayout'
@@ -62,6 +63,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['super_admin']}>
             <SuperAdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/users"
+        element={
+          <ProtectedRoute allowedRoles={['super_admin']}>
+            <UserManagement />
           </ProtectedRoute>
         }
       />

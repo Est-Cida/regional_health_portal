@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
 from models import User  # ensure table is created
-from routers import auth, surveillance, countries, outbreaks, capacity, boundaries
+from routers import auth, surveillance, countries, outbreaks, capacity, boundaries, users
 
 app = FastAPI(
     title="WHO AFRO Regional Surveillance Portal",
@@ -22,6 +22,7 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine, tables=[User.__table__])
 
 app.include_router(auth.router)
+app.include_router(users.router)
 app.include_router(surveillance.router)
 app.include_router(countries.router)
 app.include_router(outbreaks.router)
