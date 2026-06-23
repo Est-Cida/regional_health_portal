@@ -431,6 +431,34 @@ export default function SuperAdminDashboard() {
               </section>
 
               <section className="section">
+                <h2 className="section-heading">Region Summary</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+                  {bySubregion.map(sub => (
+                    <div
+                      key={sub.name}
+                      className="kpi-card"
+                      style={{ borderLeft: `4px solid ${REGION_COLORS[sub.name]}`, borderTop: 'none', cursor: 'pointer' }}
+                      onClick={() => setTab('table')}
+                    >
+                      <div className="kpi-card-header">
+                        <span className="kpi-title" style={{ color: REGION_COLORS[sub.name] }}>{sub.name} Africa</span>
+                        <span style={{ fontSize: 11, color: '#6B7C93' }}>{sub.countries} countries</span>
+                      </div>
+                      <div className="kpi-value" style={{ fontSize: 22, color: REGION_COLORS[sub.name] }}>
+                        {sub.totalCases.toLocaleString()}
+                      </div>
+                      <div className="kpi-subtitle">
+                        cases &nbsp;·&nbsp; {sub.totalDeaths.toLocaleString()} deaths
+                      </div>
+                      <div style={{ marginTop: 8, fontSize: 11, color: REGION_COLORS[sub.name], opacity: 0.8 }}>
+                        Click to view country detail →
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="section">
                 <div className="charts-grid">
                   <div className="card">
                     <div className="card-header">
@@ -477,34 +505,6 @@ export default function SuperAdminDashboard() {
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                </div>
-              </section>
-
-              <section className="section">
-                <h2 className="section-heading">Region Summary</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-                  {bySubregion.map(sub => (
-                    <div
-                      key={sub.name}
-                      className="kpi-card"
-                      style={{ borderLeft: `4px solid ${REGION_COLORS[sub.name]}`, borderTop: 'none', cursor: 'pointer' }}
-                      onClick={() => setTab('table')}
-                    >
-                      <div className="kpi-card-header">
-                        <span className="kpi-title" style={{ color: REGION_COLORS[sub.name] }}>{sub.name} Africa</span>
-                        <span style={{ fontSize: 11, color: '#6B7C93' }}>{sub.countries} countries</span>
-                      </div>
-                      <div className="kpi-value" style={{ fontSize: 22, color: REGION_COLORS[sub.name] }}>
-                        {sub.totalCases.toLocaleString()}
-                      </div>
-                      <div className="kpi-subtitle">
-                        cases &nbsp;·&nbsp; {sub.totalDeaths.toLocaleString()} deaths
-                      </div>
-                      <div style={{ marginTop: 8, fontSize: 11, color: REGION_COLORS[sub.name], opacity: 0.8 }}>
-                        Click to view country detail →
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </section>
 
