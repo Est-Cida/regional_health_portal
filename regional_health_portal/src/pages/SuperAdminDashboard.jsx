@@ -204,6 +204,8 @@ export default function SuperAdminDashboard() {
       const n = rows.length
       return {
         country:                  c.country_name,
+        iso3,
+        subregion:                c.afro_subregion,
         total_public_labs:        Math.round(rows.reduce((s, r) => s + (r.total_public_labs        || 0), 0) / n),
         labs_iso15189_accredited: Math.round(rows.reduce((s, r) => s + (r.labs_iso15189_accredited || 0), 0) / n),
         accreditation_pct:        rows.reduce((s, r) => s + (r.iso15189_accreditation_pct          || 0), 0) / n,
@@ -513,24 +515,24 @@ export default function SuperAdminDashboard() {
                     <div className="card-header">
                       <div>
                         <h2 className="card-title">Public Labs by Country — {yLabel}</h2>
+                        <span className="card-subtitle">Total public labs · highest to lowest</span>
                       </div>
-                      <span className="card-subtitle">Total labs · accredited labs · highest to lowest</span>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, color: '#059669',
+                        background: '#F0FFF4', border: '1px solid #6EE7B7',
+                        borderRadius: 6, padding: '3px 10px',
+                      }}>
+                        Accreditation % shown in tooltip
+                      </span>
                     </div>
-                    <ResponsiveContainer
-                      width="100%"
-                      height={Math.max(280, labsByCountry.length * 42) + 48}
-                    >
+                    <ResponsiveContainer width="100%" height={Math.max(260, labsByCountry.length * 34) + 16}>
                       <BarChart
                         data={labsByCountry}
                         layout="vertical"
-                        margin={{ top: 48, right: 40, left: 4, bottom: 4 }}
+                        margin={{ top: 8, right: 56, left: 4, bottom: 4 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF0" />
-                        <XAxis
-                          type="number"
-                          allowDecimals={false}
-                          tick={{ fontSize: 11, fill: '#6B7C93' }}
-                        />
+                        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#6B7C93' }} />
                         <YAxis
                           type="category"
                           dataKey="country"
@@ -543,19 +545,36 @@ export default function SuperAdminDashboard() {
                             const d = payload[0]?.payload
                             return (
                               <div className="chart-tooltip">
-                                <p className="tooltip-label">{d?.country}</p>
+                                <p className="tooltip-label">{d?.country} <span style={{ color: '#6B7C93' }}>({d?.iso3})</span></p>
                                 <p>Total Labs: <strong>{d?.total_public_labs}</strong></p>
-                                <p>Accredited: <strong>{d?.labs_iso15189_accredited}</strong></p>
+                                <p>ISO 15189 Accredited: <strong>{d?.labs_iso15189_accredited}</strong></p>
                                 <p>Accreditation rate: <strong>{d?.accreditation_pct?.toFixed(1)}%</strong></p>
+                                <p style={{ color: '#6B7C93', fontSize: 11 }}>{d?.subregion} Africa</p>
                               </div>
                             )
                           }}
                         />
-                        <Legend verticalAlign="top" height={40} wrapperStyle={{ fontSize: 11, top: 0 }} />
-                        <Bar dataKey="total_public_labs"        name="Total Public Labs"    fill="#0071BC" radius={[0, 4, 4, 0]} maxBarSize={14} />
-                        <Bar dataKey="labs_iso15189_accredited" name="ISO 15189 Accredited" fill="#059669" radius={[0, 4, 4, 0]} maxBarSize={14} />
+                        <Bar
+                          dataKey="total_public_labs"
+                          name="Total Public Labs"
+                          maxBarSize={18}
+                          radius={[0, 4, 4, 0]}
+                          label={{ position: 'right', fontSize: 11, fill: '#1A2B4A', formatter: v => v || '' }}
+                        >
+                          {labsByCountry.map(c => (
+                            <Cell key={c.iso3} fill={REGION_COLORS[c.subregion] || '#888'} />
+                          ))}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
+                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', padding: '8px 16px 16px', borderTop: '1px solid #E5EAF0' }}>
+                      {Object.entries(REGION_COLORS).map(([r, col]) => (
+                        <span key={r} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#1A2B4A' }}>
+                          <span style={{ width: 12, height: 12, borderRadius: 3, background: col, display: 'inline-block' }} />
+                          {r} Africa
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </section>
               )}
