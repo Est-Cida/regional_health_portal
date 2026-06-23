@@ -3,17 +3,20 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 
 // Top-level pages
-import LoginPage          from './pages/LoginPage'
-import RegionalDashboard  from './pages/RegionalDashboard'
-import SuperAdminDashboard from './pages/SuperAdminDashboard'
+import LoginPage            from './pages/LoginPage'
+import RegionalDashboard    from './pages/RegionalDashboard'
+import SuperAdminDashboard  from './pages/SuperAdminDashboard'
+import UserManagement       from './pages/UserManagement'
+import ProfileSettings      from './pages/ProfileSettings'
 
 // Country nested layout + sub-pages
 import CountryLayout       from './pages/country/CountryLayout'
 import CountryOverview     from './pages/country/CountryOverview'
 import DiseaseDashboard    from './pages/country/DiseaseDashboard'
 import OutbreaksDashboard  from './pages/country/OutbreaksDashboard'
-import LaboratoryDashboard from './pages/country/LaboratoryDashboard'
-import CapacityDashboard   from './pages/country/CapacityDashboard'
+import LaboratoryDashboard  from './pages/country/LaboratoryDashboard'
+import PopulationDashboard  from './pages/country/PopulationDashboard'
+import CapacityDashboard    from './pages/country/CapacityDashboard'
 import FundingDashboard    from './pages/country/FundingDashboard'
 
 import './App.css'
@@ -43,8 +46,9 @@ function AppRoutes() {
         <Route index            element={<CountryOverview />} />
         <Route path="diseases"  element={<DiseaseDashboard />} />
         <Route path="outbreaks" element={<OutbreaksDashboard />} />
-        <Route path="laboratory" element={<LaboratoryDashboard />} />
-        <Route path="capacity"  element={<CapacityDashboard />} />
+        <Route path="laboratory"  element={<LaboratoryDashboard />} />
+        <Route path="population"  element={<PopulationDashboard />} />
+        <Route path="capacity"    element={<CapacityDashboard />} />
         <Route path="funding"   element={<FundingDashboard />} />
       </Route>
 
@@ -62,6 +66,24 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['super_admin']}>
             <SuperAdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/users"
+        element={
+          <ProtectedRoute allowedRoles={['super_admin']}>
+            <UserManagement />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute allowedRoles={['country_admin', 'regional_admin', 'super_admin']}>
+            <ProfileSettings />
           </ProtectedRoute>
         }
       />

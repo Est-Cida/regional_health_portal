@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import Sidebar from '../../components/Layout/Sidebar'
 import Navbar from '../../components/Layout/Navbar'
 import MultiSelectDropdown from '../../components/MultiSelectDropdown'
+import { SUBREGIONS } from '../../data/dataService'
 
 const YEARS = [2021, 2022, 2023, 2024, 2025]
 const PRIORITY_COLOR = { 1: '#C00000', 2: '#D97706', 3: '#059669' }
@@ -13,6 +14,7 @@ const PRIORITY_LABEL = { 1: 'High Priority', 2: 'Medium Priority', 3: 'Standard'
 function CountrySubHeader() {
   const { user } = useAuth()
   const {
+    selectedRegions,  setSelectedRegions,
     selectedIsos,     setSelectedIsos,
     selectedYears,    setSelectedYears,
     selectedDiseases, setSelectedDiseases,
@@ -54,6 +56,15 @@ function CountrySubHeader() {
       </div>
 
       <div className="country-subheader-controls">
+        {user.role === 'super_admin' && (
+          <MultiSelectDropdown
+            options={SUBREGIONS.map(s => ({ value: s, label: `${s} Africa` }))}
+            selected={selectedRegions}
+            onChange={setSelectedRegions}
+            placeholder="Select region…"
+            allLabel="All Regions"
+          />
+        )}
         {user.role !== 'country_admin' && (
           <MultiSelectDropdown
             options={availableCountries.map(c => ({ value: c.iso_3_code, label: c.country_name }))}
